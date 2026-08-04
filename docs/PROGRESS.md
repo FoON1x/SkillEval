@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | P0 | 仓库与工具链骨架 | 完成 |
 | P1 | Canonical Schema + Mock 生成器 | 完成 |
-| P2 | 采集层（导入 + 推送） | 未开始 |
+| P2 | 采集层（导入 + 推送 + 运行器抽象） | 完成 |
 | P3 | 持久化与 API | 未开始 |
 | P4 | 评测引擎 + 断言 | 未开始 |
 | P5 | LLM-as-a-Judge | 未开始 |
@@ -36,6 +36,15 @@
 - TDD 共 34 用例全绿；测试揪出 error_mid 状态未置 error 的实现 bug 并修复。
 - 说明：TS 类型生成推迟到 Phase 3（届时 FastAPI 已有真实路由与响应模型，OpenAPI 完整）。
 
+## Phase 2 · 采集层（完成）
+
+- `ingest/registry.py`：可插拔注册表（register/get/parse），默认注册 opencode + codex/claude-code/pi 骨架。
+- `ingest/adapters/opencode.py`：v1 假设格式解析（session/agent/tool 事件配对、未配对标记 running、未知事件忽略并警告、结构错误 ParseError）。
+- `ingest/adapters/skeletons.py`：骨架适配器统一抛 ParseError（pending 真实样例）。
+- `runner/`：Runner 抽象（RunContext + available + run），opencode 运行器探测 CLI 可用性；POST /api/runner/run 错误路径 404/503/501。
+- API：POST /api/ingest/import（适配器解析）、POST /api/ingest/push（校验并接收 Canonical Trace）。
+- TDD 59 用例全绿。
+
 ## 下一步
 
-Phase 2：采集层（导入适配器框架 + opencode 适配器 + 推送端点）。
+Phase 3：持久化（SQLAlchemy + SQLite）与数据 API（Trace/用例/评测 CRUD + 历史查询）。

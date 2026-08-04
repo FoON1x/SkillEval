@@ -37,10 +37,10 @@ apps/api (FastAPI)
 - TDD：Schema 序列化/反序列化测试；Mock 生成器输出符合 Schema 与边界规则。
 - 出口：Schema 稳定，前端可消费生成的 TS 类型（Phase 2 联调）。
 
-### Phase 2 · 采集层（导入 + 推送）
+### Phase 2 · 采集层（导入 + 推送 + 运行器抽象）
 
-- 任务：导入适配器框架（注册表 + parse 接口）；opencode 导入适配器 + codex / claude code / pi 骨架；推送 HTTP 端点（增量事件 -> Trace 组装）。
-- TDD：用 Mock 文件测各适配器解析；推送端点事件流到入库的集成测试。
+- 任务：导入适配器框架（注册表 + parse 接口）；opencode 导入适配器 + codex / claude code / pi 骨架；推送 HTTP 端点（增量事件 -> Trace 组装）；Runner 抽象 + opencode CLI 运行器（可用性探测，真实接线随 CLI 集成落地）。
+- TDD：用 Mock 文件测各适配器解析；推送端点事件流到入库的集成测试；运行器不可用/未知 Agent 的错误路径。
 - 出口：Mock/真实文件可一键入库；推送可实时入库。
 
 ### Phase 3 · 持久化与 API
