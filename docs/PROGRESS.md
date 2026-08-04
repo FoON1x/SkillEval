@@ -7,7 +7,7 @@
 | Phase | 内容 | 状态 |
 | --- | --- | --- |
 | P0 | 仓库与工具链骨架 | 完成 |
-| P1 | Canonical Schema + Mock 生成器 | 未开始 |
+| P1 | Canonical Schema + Mock 生成器 | 完成 |
 | P2 | 采集层（导入 + 推送） | 未开始 |
 | P3 | 持久化与 API | 未开始 |
 | P4 | 评测引擎 + 断言 | 未开始 |
@@ -28,6 +28,14 @@
 - .gitignore 覆盖 venv/node_modules/dist 等。
 - 首次 git 提交（本 Phase 出口条件达成）。
 
+## Phase 1 · Canonical Trace Schema + Mock 生成器（完成）
+
+- `skill_eval/core/schema.py`：Trace / Node / ToolCall / LlmUsage / Usage / TraceError，枚举约束（AgentName / RunState / NodeStatus / NodeType），JSON round-trip 验证。
+- `skill_eval/core/projection.py`：tool_projection 深度优先收集工具调用（默认过滤 skipped），评估输入标准化。
+- `skill_eval/mock/generator.py`：5 种确定性形态（simple_ok / nested / error_mid / running / long_chain）。
+- TDD 共 34 用例全绿；测试揪出 error_mid 状态未置 error 的实现 bug 并修复。
+- 说明：TS 类型生成推迟到 Phase 3（届时 FastAPI 已有真实路由与响应模型，OpenAPI 完整）。
+
 ## 下一步
 
-Phase 1：Canonical Trace Schema（Pydantic）+ 参考 Mock 生成器（TDD）。
+Phase 2：采集层（导入适配器框架 + opencode 适配器 + 推送端点）。
