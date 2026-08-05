@@ -34,8 +34,9 @@ class TestOpencodeRunner:
 class TestRunnerApi:
     def _client(self) -> TestClient:
         from skill_eval.app import create_app
+        from skill_eval.store.repository import Store
 
-        return TestClient(create_app())
+        return TestClient(create_app(store=Store.in_memory()))
 
     def test_unknown_agent_404(self) -> None:
         resp = self._client().post("/api/runner/run", json={"agent": "nope", "task": "x"})

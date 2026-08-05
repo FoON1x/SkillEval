@@ -9,7 +9,7 @@
 | P0 | 仓库与工具链骨架 | 完成 |
 | P1 | Canonical Schema + Mock 生成器 | 完成 |
 | P2 | 采集层（导入 + 推送 + 运行器抽象） | 完成 |
-| P3 | 持久化与 API | 未开始 |
+| P3 | 持久化与数据 API | 完成 |
 | P4 | 评测引擎 + 断言 | 未开始 |
 | P5 | LLM-as-a-Judge | 未开始 |
 | P6 | 前端可视化 | 未开始 |
@@ -45,6 +45,14 @@
 - API：POST /api/ingest/import（适配器解析）、POST /api/ingest/push（校验并接收 Canonical Trace）。
 - TDD 59 用例全绿。
 
+## Phase 3 · 持久化与数据 API（完成）
+
+- `store/`：SQLAlchemy 2 模型（traces / test_cases / eval_runs），JSON 列承载 Canonical Trace；Store 仓库（save/get/list 过滤分页/delete + upsert 去重）；内存 SQLite 供测试。
+- 数据 API：GET/POST/PUT/DELETE /api/traces、/api/test-cases、/api/eval-runs；历史查询（agent/skill/status/trace_id/rule 过滤 + 分页）。
+- ingest 接入持久化：import/push 均入库（响应含 saved）；CORS 放行前端 dev 端口。
+- 已知说明：import 的响应结构不变，新增 saved/id 字段；push 契约含 saved。
+- TDD 79 用例全绿。
+
 ## 下一步
 
-Phase 3：持久化（SQLAlchemy + SQLite）与数据 API（Trace/用例/评测 CRUD + 历史查询）。
+Phase 4：评测引擎（strict/unordered/subset/superset 四规则 + 断言沙箱 + 评测结果入库）。

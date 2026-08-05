@@ -1,8 +1,8 @@
-"""Ingest HTTP endpoints: import (adapter parse) and push (canonical trace)."""
+"""Ingest HTTP endpoints: import (adapter parse + persist) and push (canonical trace)."""
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from skill_eval.core.schema import Trace
@@ -18,16 +18,18 @@ class ImportRequest(BaseModel):
 
 
 @router.post("/import")
-def import_trace(req: ImportRequest) -> dict[str, Any]:
+def import_trace(req: ImportRequest, request: Request) -> dict[str, Any]:
     try:
         trace = get_registry().parse(req.agent, req.raw)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=f"unknown agent: {exc}") from exc
     except ParseError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"status": "parsed", "trace": trace}
+    request.app.state.store.save_trace(trace)
+    return {"status": "parsed", "trace": trace, "id": trace.id, "saved": True}
 
 
 @router.post("/push")
-def push_trace(trace: Trace) -> dict[str, Any]:
-    return {"accepted": True, "id": trace.id}
+def push_trace(trace: Trace, request: Request) -> dict[str, Any]:
+    request.app.state.store.save_trace(trace)
+    return {"accepted": True, "id": trace.id, "saved": True}

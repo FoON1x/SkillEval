@@ -113,8 +113,9 @@ class TestSkeletonAdapters:
 class TestIngestApi:
     def _client(self) -> TestClient:
         from skill_eval.app import create_app
+        from skill_eval.store.repository import Store
 
-        return TestClient(create_app())
+        return TestClient(create_app(store=Store.in_memory()))
 
     def test_import_ok(self) -> None:
         resp = self._client().post(
@@ -161,7 +162,7 @@ class TestIngestApi:
         ).model_dump()
         resp = self._client().post("/api/ingest/push", json=trace)
         assert resp.status_code == 200
-        assert resp.json() == {"accepted": True, "id": "push-1"}
+        assert resp.json() == {"accepted": True, "id": "push-1", "saved": True}
 
     def test_push_invalid_trace(self) -> None:
         resp = self._client().post("/api/ingest/push", json={"id": 1})
