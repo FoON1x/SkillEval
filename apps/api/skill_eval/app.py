@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from skill_eval.eval.api import router as eval_router
 from skill_eval.ingest.api import router as ingest_router
 from skill_eval.runner.api import router as runner_router
 from skill_eval.store.api import router as store_router
@@ -28,6 +29,7 @@ def create_app(store: Store | None = None) -> FastAPI:
     app.include_router(ingest_router)
     app.include_router(runner_router)
     app.include_router(store_router)
+    app.include_router(eval_router)
 
     @app.get("/health")
     def health() -> dict[str, str]:

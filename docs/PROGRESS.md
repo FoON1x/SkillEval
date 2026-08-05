@@ -10,7 +10,7 @@
 | P1 | Canonical Schema + Mock 生成器 | 完成 |
 | P2 | 采集层（导入 + 推送 + 运行器抽象） | 完成 |
 | P3 | 持久化与数据 API | 完成 |
-| P4 | 评测引擎 + 断言 | 未开始 |
+| P4 | 评测引擎 + 断言 | 完成 |
 | P5 | LLM-as-a-Judge | 未开始 |
 | P6 | 前端可视化 | 未开始 |
 | P7 | 打磨与收尾 | 未开始 |
@@ -53,6 +53,14 @@
 - 已知说明：import 的响应结构不变，新增 saved/id 字段；push 契约含 saved。
 - TDD 79 用例全绿。
 
+## Phase 4 · 评测引擎 + 断言（完成）
+
+- `eval/rules.py`：strict（序列全等+错位明细）/ unordered（多重集相等）/ subset（不得有期望外工具）/ superset（必须覆盖必需工具），输出 missing/unexpected/mismatches。
+- `eval/sandbox.py`：受限 Python 断言（子进程 + 超时 + builtins 白名单），支持表达式或 `result=` 语句块；工具对象提供属性访问；异常/语法错误/超时均转化为失败信息。
+- `eval/service.py`：rule + 断言综合评分 score=(规则通过+断言通过)/(1+断言数)。
+- `eval/api.py`：POST /api/eval/run 评测并持久化 EvalRun（passed/failed/error），异常路径不阻塞。
+- TDD 120 用例全绿（本轮揪出：沙箱作用域问题、Mock 工具名序列假设）。
+
 ## 下一步
 
-Phase 4：评测引擎（strict/unordered/subset/superset 四规则 + 断言沙箱 + 评测结果入库）。
+Phase 5：LLM-as-a-Judge（OpenAI 兼容 Provider + 结果级/全过程级分析器 + Mock 驱动测试）。
