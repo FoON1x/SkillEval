@@ -11,6 +11,9 @@ htmlcov/
 node_modules/
 dist/
 *.tsbuildinfo
+test-results/
+playwright-report/
+blob-report/
 
 # Env / local
 .env

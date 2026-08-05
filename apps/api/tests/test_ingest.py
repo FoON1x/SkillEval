@@ -102,6 +102,45 @@ class TestOpencodeAdapter:
         trace = get_registry().parse("opencode", raw)
         assert trace.status == "completed"
 
+    def test_llm_events_build_llm_call_node(self) -> None:
+        raw = dict(OPENCODE_RAW)
+        raw["events"] = [
+            *raw["events"][:4],
+            {
+                "type": "llm.start",
+                "model": "claude-sonnet",
+                "input_tokens": 100,
+                "ts": "2026-08-04T10:00:05Z",
+            },
+            {
+                "type": "llm.end",
+                "output_tokens": 50,
+                "cost_usd": 0.001,
+                "latency_ms": 900,
+                "ts": "2026-08-04T10:00:06Z",
+            },
+            *raw["events"][4:],
+        ]
+        trace = get_registry().parse("opencode", raw)
+        llm_nodes = [n for n in trace.iter_nodes() if n.type == NodeType.LLM_CALL]
+        assert len(llm_nodes) == 1
+        assert llm_nodes[0].status == NodeStatus.COMPLETED
+        assert llm_nodes[0].llm is not None
+        assert llm_nodes[0].llm.model == "claude-sonnet"
+        assert llm_nodes[0].llm.total_tokens == 150
+        assert llm_nodes[0].llm.cost_usd == 0.001
+        assert llm_nodes[0].llm.latency_ms == 900
+
+    def test_llm_end_without_start_raises(self) -> None:
+        raw = dict(OPENCODE_RAW)
+        raw["events"] = [
+            *raw["events"][:4],
+            {"type": "llm.end", "output_tokens": 5, "ts": "2026-08-04T10:00:06Z"},
+            *raw["events"][4:],
+        ]
+        with pytest.raises(ParseError):
+            get_registry().parse("opencode", raw)
+
 
 class TestSkeletonAdapters:
     @pytest.mark.parametrize("agent", ["codex", "claude-code", "pi"])

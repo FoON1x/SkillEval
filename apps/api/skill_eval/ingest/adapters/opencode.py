@@ -10,6 +10,8 @@ Expected raw JSON:
     {"type": "agent.start", "ts": iso8601},
     {"type": "tool.start", "tool": str, "args": {...}, "ts": iso8601},
     {"type": "tool.end",   "tool": str, "result": {...}, "ts": iso8601},
+    {"type": "llm.start",  "model": str | None, "input_tokens": int | None, ...},
+    {"type": "llm.end",    "output_tokens": int | None, "cost_usd": float | None, ...},
     {"type": "agent.end",  "ts": iso8601},
     {"type": "session.end", "ts": iso8601},
     ...
@@ -25,6 +27,7 @@ from typing import Any
 
 from skill_eval.core.schema import (
     AgentName,
+    LlmUsage,
     Node,
     NodeStatus,
     NodeType,
@@ -80,6 +83,7 @@ class OpencodeImporter(BaseImporter):
 
         step: Node | None = None
         open_tools: dict[str, Node] = {}
+        open_llms: list[Node] = []
         session_ended = False
 
         def ensure_step() -> Node:
@@ -125,6 +129,37 @@ class OpencodeImporter(BaseImporter):
                 assert node.tool is not None
                 node.tool.result = ev.get("result")
                 node.output = ev.get("result")
+            elif kind == "llm.start":
+                node = Node(
+                    id=next_id(),
+                    type=NodeType.LLM_CALL,
+                    name=f"llm:{ev.get('model') or 'call'}",
+                    status=NodeStatus.RUNNING,
+                    started_at=ts,
+                    llm=LlmUsage(
+                        model=ev.get("model"),
+                        input_tokens=ev.get("input_tokens"),
+                        output_tokens=ev.get("output_tokens"),
+                        cost_usd=ev.get("cost_usd"),
+                        latency_ms=ev.get("latency_ms"),
+                    ),
+                )
+                ensure_step().children.append(node)
+                open_llms.append(node)
+            elif kind == "llm.end":
+                if not open_llms:
+                    raise ParseError("llm.end without matching llm.start")
+                node = open_llms.pop()
+                node.status = NodeStatus.COMPLETED
+                node.ended_at = ts
+                node.duration_ms = _ms(node.started_at, ts)
+                assert node.llm is not None
+                usage = node.llm
+                for field in ("input_tokens", "output_tokens", "cost_usd", "latency_ms"):
+                    value = ev.get(field)
+                    if getattr(usage, field) is None and value is not None:
+                        setattr(usage, field, value)
+                usage.total_tokens = (usage.input_tokens or 0) + (usage.output_tokens or 0) or None
             elif kind == "agent.end":
                 if step is not None:
                     step.ended_at = ts
@@ -139,7 +174,7 @@ class OpencodeImporter(BaseImporter):
         for node in open_tools.values():
             node.status = NodeStatus.RUNNING
 
-        running = bool(open_tools) or not session_ended
+        running = bool(open_tools) or bool(open_llms) or not session_ended
         if not running:
             end = Node(id=next_id(), type=NodeType.SKILL_END, name="skill_end",
                        ended_at=root.ended_at, duration_ms=_ms(root.ended_at, root.started_at))

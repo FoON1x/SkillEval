@@ -12,7 +12,7 @@
 | P3 | 持久化与数据 API | 完成 |
 | P4 | 评测引擎 + 断言 | 完成 |
 | P5 | LLM-as-a-Judge | 完成 |
-| P6 | 前端可视化 | 未开始 |
+| P6 | 前端可视化 | 完成 |
 | P7 | 打磨与收尾 | 未开始 |
 
 ## 规划阶段记录
@@ -69,6 +69,17 @@
 - DTO 扩展：RuleName 增加 llm-result/llm-process，EvalResult 增加 review。
 - TDD 138 用例全绿（MockTransport 验证请求构造 + Fake LLM 驱动分析器/API）。
 
+## Phase 6 · 前端可视化（完成）
+
+- 依赖：tailwindcss + @tailwindcss/vite、@xyflow/react（React Flow）、react-router-dom、recharts；openapi-typescript + @playwright/test。
+- 类型链路：FastAPI 导出 openapi.json（scripts/export_openapi.py）→ openapi-typescript 生成 src/api/types.generated.ts；src/api/client.ts fetch 封装（BASE 可经 VITE_API_BASE 覆盖）。
+- 设计基础：Tailwind v4 @theme token（canvas/surface/line/ink/muted/faint/accent/accent-soft/ok/bad/wait/skip），Anthropic 风格侧边栏布局。
+- 工具函数（TDD）：utils/trace.ts（flattenTree / buildTimeline / traceStats / nodeTitle / statusColor，traceStats 聚合节点级 llm usage 兜底 trace.usage）、utils/diff.ts（LCS 序列 diff + 参数 diff + projectTrace）。
+- 页面与组件：/traces 列表（Agent/状态过滤）、/traces/:id 详情（React Flow DAG + Timeline + DetailPanel + CostPanel + LLM 结果级/全过程按钮）、/test-cases 用例管理（新建/评测/删除）、/eval-runs 评测记录、/diff 双 Trace 对比（?from= 预选基线）。
+- 后端补充：opencode 适配器支持 llm.start/llm.end 事件（LLM_CALL 节点 + LlmUsage 聚合，未配对报错）——后端 140 用例全绿。
+- 质量：前端 vitest 20 用例 + tsc --noEmit + vite build 全绿；Playwright E2E 5 用例全绿（chromium headless 用 channel=chromium，避免 headless-shell 下载）。
+- 说明：Windows 下 Playwright 默认下载 headless-shell 常超时，playwright.config.ts 以 use.channel='chromium' 复用完整 chromium；e2e 使用独立 SQLite（data/e2e.db，启动时清理含 WAL）。
+
 ## 下一步
 
-Phase 6：前端可视化（Anthropic 风格 UI 基础 + Trace DAG/时间线 + 用例管理 + 评测结果 + Diff 视图）。
+Phase 7：打磨与收尾（真实 Agent Trace 样例回填 Schema、LLM 评测联调、性能/细节优化）。
