@@ -11,7 +11,7 @@
 | P2 | 采集层（导入 + 推送 + 运行器抽象） | 完成 |
 | P3 | 持久化与数据 API | 完成 |
 | P4 | 评测引擎 + 断言 | 完成 |
-| P5 | LLM-as-a-Judge | 未开始 |
+| P5 | LLM-as-a-Judge | 完成 |
 | P6 | 前端可视化 | 未开始 |
 | P7 | 打磨与收尾 | 未开始 |
 
@@ -61,6 +61,14 @@
 - `eval/api.py`：POST /api/eval/run 评测并持久化 EvalRun（passed/failed/error），异常路径不阻塞。
 - TDD 120 用例全绿（本轮揪出：沙箱作用域问题、Mock 工具名序列假设）。
 
+## Phase 5 · LLM-as-a-Judge（完成）
+
+- `judge/client.py`：OpenAI 兼容 chat/completions 客户端（base_url/api_key/model 可配置，默认读 SKILLEVAL_LLM_* 环境变量），错误映射 LLMError。
+- `judge/analyzers.py`：JudgeReport 固定 JSON 结构（score/verdict/summary/findings + raw 兜底）；ResultJudge（结果级）+ ProcessAnalyzer（全过程级，Trace digest：工具序列/状态/错误/usage）。
+- `judge/api.py`：POST /api/judge/result 与 /api/judge/process，结果以 eval-run 持久化（rule=llm-result/llm-process，verdict 映射 passed/failed/review）；未配置 503、无最终输出 400、未知 trace 404。
+- DTO 扩展：RuleName 增加 llm-result/llm-process，EvalResult 增加 review。
+- TDD 138 用例全绿（MockTransport 验证请求构造 + Fake LLM 驱动分析器/API）。
+
 ## 下一步
 
-Phase 5：LLM-as-a-Judge（OpenAI 兼容 Provider + 结果级/全过程级分析器 + Mock 驱动测试）。
+Phase 6：前端可视化（Anthropic 风格 UI 基础 + Trace DAG/时间线 + 用例管理 + 评测结果 + Diff 视图）。

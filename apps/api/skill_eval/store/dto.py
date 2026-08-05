@@ -6,8 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-RuleName = Literal["strict", "unordered", "subset", "superset"]
-EvalResult = Literal["passed", "failed", "error"]
+RuleName = Literal["strict", "unordered", "subset", "superset", "llm-result", "llm-process"]
+EvalResult = Literal["passed", "failed", "review", "error"]
 
 
 class ExpectedPath(BaseModel):

@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from skill_eval.eval.api import router as eval_router
 from skill_eval.ingest.api import router as ingest_router
+from skill_eval.judge.api import router as judge_router
+from skill_eval.judge.client import LLMClient
 from skill_eval.runner.api import router as runner_router
 from skill_eval.store.api import router as store_router
 from skill_eval.store.repository import Store
@@ -16,7 +18,7 @@ CORS_ORIGINS = [
 ]
 
 
-def create_app(store: Store | None = None) -> FastAPI:
+def create_app(store: Store | None = None, judge_client: LLMClient | None = None) -> FastAPI:
     app = FastAPI(title=APP_NAME, version=__version__)
     app.add_middleware(
         CORSMiddleware,
@@ -26,10 +28,12 @@ def create_app(store: Store | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     app.state.store = store or Store.default()
+    app.state.judge_client = judge_client or LLMClient()
     app.include_router(ingest_router)
     app.include_router(runner_router)
     app.include_router(store_router)
     app.include_router(eval_router)
+    app.include_router(judge_router)
 
     @app.get("/health")
     def health() -> dict[str, str]:
