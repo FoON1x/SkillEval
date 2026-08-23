@@ -154,3 +154,99 @@ class TestRunnerApi:
         monkeypatch.setattr(shutil, "which", lambda _: None)
         resp = self._client().post("/api/runner/run", json={"agent": "opencode", "task": "x"})
         assert resp.status_code == 503
+
+
+class TestRunnerStreamApi:
+    def _client(self) -> TestClient:
+        from skill_eval.app import create_app
+        from skill_eval.store.repository import Store
+
+        return TestClient(create_app(store=Store.in_memory()))
+
+    def _patch_runner(self, monkeypatch: pytest.MonkeyPatch, trace_id: str = "tr-1") -> None:
+        from skill_eval.core.schema import NodeType, RunState, Trace, Node
+        from skill_eval.runner.base import RunContext
+
+        canned_trace = Trace(
+            id=trace_id, agent="opencode", skill_name="s", status=RunState.COMPLETED,
+            root=Node(id="r", type=NodeType.SKILL_START, name="s"),
+        )
+
+        def fake_run_stream(self, ctx: RunContext, emit) -> Trace:
+            emit({"node_type": "agent_step", "status": "running"})
+            emit({"node_type": "tool_call", "status": "completed", "name": "bash"})
+            return canned_trace
+
+        monkeypatch.setattr(shutil, "which", lambda b: "/fake/opencode")
+        monkeypatch.setattr(
+            "skill_eval.runner.opencode.OpencodeRunner.run_stream", fake_run_stream
+        )
+
+    def test_stream_emits_events_then_done(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._patch_runner(monkeypatch)
+        resp = self._client().post(
+            "/api/runner/run/stream",
+            json={"agent": "opencode", "task": "hi", "skill_name": "s", "cwd": "C:/tmp"},
+        )
+        assert resp.status_code == 200
+        text = resp.text
+        assert 'data: {"type": "event"' in text
+        assert "agent_step" in text
+        assert "bash" in text
+        assert 'data: {"type": "done", "trace_id": "tr-1"}' in text
+
+    def test_stream_persists_trace(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._patch_runner(monkeypatch, trace_id="tr-persist")
+        c = self._client()
+        c.post("/api/runner/run/stream", json={"agent": "opencode", "task": "hi"})
+        got = c.get("/api/traces/tr-persist")
+        assert got.status_code == 200
+        assert got.json()["id"] == "tr-persist"
+
+    def test_stream_unknown_agent_404(self) -> None:
+        resp = self._client().post(
+            "/api/runner/run/stream", json={"agent": "nope", "task": "x"}
+        )
+        assert resp.status_code == 404
+
+    def test_stream_cli_missing_503(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(shutil, "which", lambda _: None)
+        resp = self._client().post(
+            "/api/runner/run/stream", json={"agent": "opencode", "task": "x"}
+        )
+        assert resp.status_code == 503
+
+
+class TestSkillsApi:
+    def _client(self) -> TestClient:
+        from skill_eval.app import create_app
+        from skill_eval.store.repository import Store
+
+        return TestClient(create_app(store=Store.in_memory()))
+
+    def test_lists_skills_from_dirs(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+        skills_dir = tmp_path / "skills"
+        for name, desc in [("xlsx", "spreadsheet skill"), ("pdf", "pdf skill")]:
+            d = skills_dir / name
+            d.mkdir(parents=True)
+            (d / "SKILL.md").write_text(
+                f'---\nname: {name}\ndescription: "{desc}"\n---\nbody\n', encoding="utf-8"
+            )
+        monkeypatch.setattr(
+            "skill_eval.runner.skills.default_skill_dirs", lambda: [skills_dir]
+        )
+        resp = self._client().get("/api/runner/skills")
+        assert resp.status_code == 200
+        names = [s["name"] for s in resp.json()["skills"]]
+        assert "xlsx" in names and "pdf" in names
+        xlsx = [s for s in resp.json()["skills"] if s["name"] == "xlsx"][0]
+        assert xlsx["description"] == "spreadsheet skill"
+
+    def test_skills_handles_missing_dir(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+        monkeypatch.setattr(
+            "skill_eval.runner.skills.default_skill_dirs",
+            lambda: [tmp_path / "nonexistent"],
+        )
+        resp = self._client().get("/api/runner/skills")
+        assert resp.status_code == 200
+        assert resp.json()["skills"] == []
