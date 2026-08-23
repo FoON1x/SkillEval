@@ -79,6 +79,7 @@
 - 后端补充：opencode 适配器支持 llm.start/llm.end 事件（LLM_CALL 节点 + LlmUsage 聚合，未配对报错）——后端 140 用例全绿。
 - 质量：前端 vitest 20 用例 + tsc --noEmit + vite build 全绿；Playwright E2E 5 用例全绿（chromium headless 用 channel=chromium，避免 headless-shell 下载）。
 - 说明：Windows 下 Playwright 默认下载 headless-shell 常超时，playwright.config.ts 以 use.channel='chromium' 复用完整 chromium；e2e 使用独立 SQLite（data/e2e.db，启动时清理含 WAL）。
+- [2026-08-09] 后端虚拟环境迁移至 uv 管理：依赖声明收敛到 pyproject.toml（dependencies + [dependency-groups] dev），删除 requirements*.txt 与旧 .venv，uv sync 生成 uv.lock；`uv run uvicorn ...` 启动、`uv run pytest` 140 用例全绿；README 启动说明同步更新。
 
 ## 下一步
 
