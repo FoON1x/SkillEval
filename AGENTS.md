@@ -27,13 +27,13 @@ npm run dev          # http://localhost:5173
 ## 测试与验证
 
 ```powershell
-# 后端（apps/api）—— 140 例
+# 后端（apps/api）—— 151 例
 uv run pytest
 uv run pytest tests/test_rules.py            # 单文件
 uv run pytest tests/test_rules.py::test_xxx  # 单用例
 
 # 前端（apps/web）
-npm test              # vitest run，20 例
+npm test              # vitest run，24 例
 npm run test:watch    # 监听
 npm run test:e2e      # Playwright E2E，5 例
 
@@ -56,7 +56,8 @@ npx tsc -b
   - `apps/web/openapi.json` 与 `src/api/types.generated.ts` 均为提交的构建产物。
 - **`skill_eval/eval/` 保持纯逻辑、无 I/O**（ADR-004）：规则评估与自定义断言可单测、可离线。自定义断言在受限沙箱运行（subprocess + 超时 + 资源限制，禁止文件/网络）。
 - **存储模型**（ADR-003）：Trace 本体存 JSON 列，索引列仅存查询投影（agent/skill/session/time/status）。Diff 在内存中基于 Schema 对象计算。
-- **采集双通道 + Runner 抽象**（ADR-005）：导入适配器 `parse(raw) -> Trace` 按 agent 注册；推送端点组装增量事件；Runner 抽象 `run(context) -> run_id + events`。**目前仅 opencode 适配器/运行器已实现**，codex / claude code / pi 为骨架（导入返回未实现错误）。
+- **采集双通道 + Runner 抽象**（ADR-005）：导入适配器 `parse(raw) -> Trace` 按 agent 注册；推送端点组装增量事件；Runner 抽象 `run_stream(context, emit) -> Trace`。**opencode 适配器已用真实 `opencode run --format json` JSONL 格式实现**（事件 `step_start`/`text`/`tool_use`/`step_finish`，epoch-ms 时间戳），runner 已落地（spawn CLI + SSE 流 + `opencode export` enrich）；codex / claude code / pi 为骨架（导入返回未实现错误）。
+- **opencode CLI 运行**：前端 `/run` 页 → `POST /api/runner/run/stream`（SSE）。后端 `OpencodeRunner.run_stream` spawn 子进程、逐行读 JSONL、emit 事件、结束后 `opencode export <sid>` 取权威 metadata。`GET /api/runner/skills` 扫描 `~/.agents/skills` + superpowers skills 的 SKILL.md frontmatter。opencode skill 由模型自动触发、无法强制，所选 skill 注入引导语到 prompt。
 
 ## 环境变量
 

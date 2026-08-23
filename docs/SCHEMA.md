@@ -101,11 +101,24 @@ ToolCallRef: { node_id, name, args, result }
 - 输出项：新增/缺失/顺序变化/同名参数差异/状态差异。
 - 文本降级：无法结构对齐时提供逐字段文本对比。
 
-## 7. 扩展与映射（待真实样例回填）
+## 7. 扩展与映射（opencode 已回填真实格式）
+
+opencode 适配器消费 `opencode run --format json` 的 JSONL 输出（CLI ≥ 1.18）。每行一个 JSON：
+`{"type","timestamp"(epoch ms),"sessionID","part":{...}}`。
+
+| opencode 事件 | Canonical 节点 | 说明 |
+| --- | --- | --- |
+| `step_start` | `AGENT_STEP`（root 子节点，status=running） | 一次模型推理步 |
+| `text` | `MESSAGE`（挂当前 step） | `part.text` → `node.output` |
+| `tool_use` | `TOOL_CALL`（挂当前 step） | `part.state.{input,output,metadata.exit,time}` → args/result/状态/时序；`metadata.exit!=0` 标 `ERROR` |
+| `step_finish` | 关闭当前 step；`reason=="stop"` 触发 `SKILL_END` | `part.tokens`/`cost` 聚合到 step 的 `LlmUsage` |
+| 其它（`reasoning` 等） | 忽略（ParseWarning） | `--thinking` 或 export 才有 reasoning |
+
+`opencode export <sessionID>` 的 `info`（title/agent/model/cost/tokens/time）比实时流更权威，`finalize(export_info)` 时合并填入 trace 级 `usage`/`tool_version`。导入端点 `/api/ingest/import` 接受 `{session_id?, skill_name?, events:[...], export_info?}`。
 
 | Agent | 期望来源 | 映射清单 |
 | --- | --- | --- |
-| opencode | session/event 流（含 CLI headless 事件） | 待回填 |
+| opencode | `opencode run --format json` JSONL + `opencode export` | 已实现（见上表） |
 | claude code | ~/.claude/projects/*.jsonl | 待回填 |
 | codex | codex log 目录 | 待回填 |
 | pi | 待确认 | 待回填 |

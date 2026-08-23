@@ -26,7 +26,7 @@
 - 后端：Python 3.12 + FastAPI + Pydantic v2 + SQLAlchemy + SQLite（依赖由 [uv](https://docs.astral.sh/uv/) 管理）
 - 前端：React 19 + TypeScript + Vite + Tailwind CSS v4 + React Flow
 - 跨语言 Schema：Pydantic 为单一事实源，OpenAPI 自动生成 TS 类型（`src/api/types.generated.ts`）
-- 测试：pytest（后端 140 例）· Vitest（前端 20 例）· Playwright（E2E 5 例）
+- 测试：pytest（后端 151 例）· Vitest（前端 24 例）· Playwright（E2E 5 例）
 
 ## 快速开始
 
@@ -50,24 +50,26 @@ npm run dev
 
 ### 导入一条 Trace
 
-opencode v1 事件流格式（`docs/SCHEMA.md §7`）：
+opencode 真实事件流格式（`docs/SCHEMA.md §7`，每行为 JSONL 的一个事件）：
 
 ```powershell
 curl -X POST http://127.0.0.1:8000/api/ingest/import -H "Content-Type: application/json" -d '{
   "agent": "opencode",
   "raw": {
-    "version": "0.1",
-    "session_id": "sess-1",
+    "session_id": "ses-1",
     "skill_name": "demo-skill",
     "events": [
-      {"type": "session.start", "ts": "2026-08-04T10:00:00Z"},
-      {"type": "agent.start",   "ts": "2026-08-04T10:00:01Z"},
-      {"type": "tool.start", "tool": "read_file", "args": {"path": "/a"}, "ts": "2026-08-04T10:00:02Z"},
-      {"type": "tool.end",   "tool": "read_file", "result": {"ok": true}, "ts": "2026-08-04T10:00:07Z"},
-      {"type": "llm.start",  "model": "claude-sonnet", "input_tokens": 100, "ts": "2026-08-04T10:00:07Z"},
-      {"type": "llm.end",    "output_tokens": 50, "cost_usd": 0.001, "latency_ms": 900, "ts": "2026-08-04T10:00:08Z"},
-      {"type": "agent.end",  "ts": "2026-08-04T10:00:13Z"},
-      {"type": "session.end", "ts": "2026-08-04T10:00:15Z"}
+      {"type": "step_start", "timestamp": 1787496800000, "sessionID": "ses-1",
+       "part": {"id": "p1", "messageID": "m1", "sessionID": "ses-1", "type": "step-start"}},
+      {"type": "tool_use", "timestamp": 1787496802000, "sessionID": "ses-1",
+       "part": {"type": "tool", "tool": "bash", "callID": "c1",
+                "state": {"status": "completed", "input": {"command": "ls"}, "output": "a.txt",
+                          "metadata": {"exit": 0}, "title": "ls",
+                          "time": {"start": 1787496802000, "end": 1787496805000}},
+                "id": "p2", "sessionID": "ses-1", "messageID": "m1"}},
+      {"type": "step_finish", "timestamp": 1787496805000, "sessionID": "ses-1",
+       "part": {"id": "p3", "reason": "stop", "messageID": "m1", "sessionID": "ses-1",
+                "type": "step-finish", "tokens": {"total": 100, "input": 80, "output": 20}, "cost": 0.001}}
     ]
   }
 }'
@@ -75,6 +77,13 @@ curl -X POST http://127.0.0.1:8000/api/ingest/import -H "Content-Type: applicati
 
 开发联调也可直接生成 Mock Trace（`skill_eval.mock.generator`，5 种确定性形态）或调
 `POST /api/ingest/push` 推送完整 Canonical Trace。
+
+### 运行 opencode CLI 并抓取 Trace
+
+在 `http://localhost:5173/run` 选择 Skill（下拉来自已安装的 opencode skill）、Agent、工作目录，
+输入 prompt 后点「运行」。后端 spawn `opencode run --format json --auto`，通过 SSE 实时推送事件到
+前端，运行结束自动入库并跳转到 Trace 详情页——便于快速调试 skill。opencode skill 由模型按需自动
+触发，所选 skill 的引导语会注入 prompt 以提高命中（无法强制触发）。
 
 ### 创建测试用例并评测
 
@@ -100,8 +109,7 @@ $env:SKILLEVAL_LLM_MODEL    = "deepseek-chat"
 ### Diff 与 CLI 触发
 
 - **Diff**：任一 Trace 详情页点「Diff 对比」，或直接访问 `/diff?from=<trace_id>`，再选另一条 Trace。
-- **CLI 触发运行**：`POST /api/runner/run`（body：`agent` / `task` / 可选 `session_id`），由 Runner 调起 Agent CLI
-  并回填 Trace；opencode CLI 未安装时返回 503。
+- **CLI 触发运行**：`POST /api/runner/run`（同步）或 `/api/runner/run/stream`（SSE 实时流）；前端 `/run` 页直接运行，opencode CLI 未安装时返回 503。
 
 ## API 概览
 
@@ -109,7 +117,9 @@ $env:SKILLEVAL_LLM_MODEL    = "deepseek-chat"
 | --- | --- | --- |
 | POST | `/api/ingest/import` | 按 Agent 适配器解析并入库原始事件流 |
 | POST | `/api/ingest/push` | 接收 Canonical Trace 并入库 |
-| POST | `/api/runner/run` | 触发 Agent CLI 运行 |
+| POST | `/api/runner/run` | 触发 Agent CLI 运行（同步） |
+| POST | `/api/runner/run/stream` | 触发 Agent CLI 运行（SSE 实时事件流，结束返回 trace_id） |
+| GET | `/api/runner/skills` | 列出已安装的 opencode skill（name/description） |
 | GET/POST/PUT/DELETE | `/api/traces` `/api/test-cases` `/api/eval-runs` | 数据 CRUD（列表支持过滤 + 分页） |
 | POST | `/api/eval/run` | 对指定 Trace 运行指定用例评测 |
 | POST | `/api/judge/result` `/api/judge/process` | LLM 结果级 / 全过程级评测 |
@@ -119,8 +129,8 @@ $env:SKILLEVAL_LLM_MODEL    = "deepseek-chat"
 ## 测试
 
 ```powershell
-cd apps/api && uv run pytest          # 后端 140 例
-cd apps/web && npm test               # 前端 20 例
+cd apps/api && uv run pytest          # 后端 151 例
+cd apps/web && npm test               # 前端 24 例
 cd apps/web && npm run test:e2e       # Playwright E2E 5 例（自动拉起前后端）
 ```
 
@@ -150,7 +160,7 @@ skilleval/
 
 ## 已知限制与路线图
 
-- **opencode Trace 格式为 v1 假设**：尚未拿到真实样例回填（`docs/SCHEMA.md §7`），真实日志落地后可能调整
+- **opencode Trace 格式已回填真实样例**：适配器消费 `opencode run --format json` 的 JSONL 事件流（详见 `docs/SCHEMA.md §7`）
 - codex / claude code / pi：仅骨架适配器（导入会返回未实现错误），待样例确认后实现
 - 无鉴权的本地单机工具；LLM 密钥仅存环境变量，不入库
-- 路线图：Trace 导入 UI、100+ 节点性能优化、OpenAPI 漂移 CI 检查、一键启动脚本
+- 路线图：100+ 节点性能优化、OpenAPI 漂移 CI 检查、一键启动脚本

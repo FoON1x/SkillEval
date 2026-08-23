@@ -13,7 +13,8 @@
 | P4 | 评测引擎 + 断言 | 完成 |
 | P5 | LLM-as-a-Judge | 完成 |
 | P6 | 前端可视化 | 完成 |
-| P7 | 打磨与收尾 | 未开始 |
+| P7 | opencode CLI 运行抓 Trace（Run 页 + SSE） | 完成 |
+| P8 | 打磨与收尾 | 未开始 |
 
 ## 规划阶段记录
 
@@ -81,6 +82,14 @@
 - 说明：Windows 下 Playwright 默认下载 headless-shell 常超时，playwright.config.ts 以 use.channel='chromium' 复用完整 chromium；e2e 使用独立 SQLite（data/e2e.db，启动时清理含 WAL）。
 - [2026-08-09] 后端虚拟环境迁移至 uv 管理：依赖声明收敛到 pyproject.toml（dependencies + [dependency-groups] dev），删除 requirements*.txt 与旧 .venv，uv sync 生成 uv.lock；`uv run uvicorn ...` 启动、`uv run pytest` 140 用例全绿；README 启动说明同步更新。
 
+## Phase 7 · opencode CLI 运行抓 Trace（完成）
+
+- [2026-08-23] 用真实 `opencode run --format json` JSONL 事件流（`step_start`/`text`/`tool_use`/`step_finish`，epoch-ms 时间戳）回填 opencode 适配器，替换原虚构 v1 假设格式；新增 `TraceBuilder` 增量 API（`feed`/`finalize`），`finalize` 合并 `opencode export` 的权威 trace 级 metadata（title/agent/model/cost/tokens）。失败工具（`metadata.exit!=0`）标 `NodeStatus.ERROR`。
+- [2026-08-23] 实现 `OpencodeRunner.run_stream`：spawn `opencode run --format json --auto [--agent] [--session] [--dir] [--model]`，逐行读 JSONL → 喂 `TraceBuilder` → emit 规范化事件 → 进程结束后 `opencode export` enrich → 返回 Trace；非零退出/超时标 `RunState.ERROR`。`RunContext` 新增 `skill_name/cwd/auto/timeout/agent_name/model`。
+- [2026-08-23] 新增 SSE 端点 `POST /api/runner/run/stream`（`text/event-stream`，线程+队列：event/done/error 帧）与 `GET /api/runner/skills`（扫描 `~/.agents/skills` + superpowers skills，解析 SKILL.md frontmatter）。
+- [2026-08-23] 前端新增 `/run` 页：skill 下拉 / agent 选择 / 工作目录 / `--auto` 开关 / prompt，提交后 fetch+ReadableStream 消费 SSE，实时渲染事件流，done 帧跳转 `/traces/:id`；选中的 skill 注入引导语到 prompt（opencode skill 由模型自动触发，无法强制）。
+- [2026-08-23] OpenAPI/TS 类型重生成。后端 151 用例、前端 24 用例全绿。
+
 ## 下一步
 
-Phase 7：打磨与收尾（真实 Agent Trace 样例回填 Schema、LLM 评测联调、性能/细节优化）。
+Phase 8：打磨与收尾（其余 Agent Trace 样例回填、LLM 评测联调、性能/细节优化）。
