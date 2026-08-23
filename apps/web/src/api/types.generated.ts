@@ -55,6 +55,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runner/run/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Stream */
+        post: operations["run_stream_api_runner_run_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runner/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Skills */
+        get: operations["get_skills_api_runner_skills_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/traces": {
         parameters: {
             query?: never;
@@ -465,6 +499,36 @@ export interface components {
          * @enum {string}
          */
         RunState: "completed" | "running" | "error" | "cancelled";
+        /** StreamRunRequest */
+        StreamRunRequest: {
+            /**
+             * Agent
+             * @default opencode
+             */
+            agent: string;
+            /** Task */
+            task: string;
+            /** Skill Name */
+            skill_name?: string | null;
+            /** Session Id */
+            session_id?: string | null;
+            /** Cwd */
+            cwd?: string | null;
+            /**
+             * Auto
+             * @default true
+             */
+            auto: boolean;
+            /**
+             * Timeout
+             * @default 300
+             */
+            timeout: number;
+            /** Agent Name */
+            agent_name?: string | null;
+            /** Model */
+            model?: string | null;
+        };
         /** TestCaseCreate */
         TestCaseCreate: {
             /** Name */
@@ -781,6 +845,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_stream_api_runner_run_stream_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StreamRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_skills_api_runner_skills_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

@@ -134,6 +134,68 @@
         }
       }
     },
+    "/api/runner/run/stream": {
+      "post": {
+        "tags": [
+          "runner"
+        ],
+        "summary": "Run Stream",
+        "operationId": "run_stream_api_runner_run_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StreamRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runner/skills": {
+      "get": {
+        "tags": [
+          "runner"
+        ],
+        "summary": "Get Skills",
+        "operationId": "get_skills_api_runner_skills_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Skills Api Runner Skills Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/traces": {
       "get": {
         "tags": [
@@ -1626,6 +1688,89 @@
           "cancelled"
         ],
         "title": "RunState"
+      },
+      "StreamRunRequest": {
+        "properties": {
+          "agent": {
+            "type": "string",
+            "title": "Agent",
+            "default": "opencode"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "skill_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill Name"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "cwd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cwd"
+          },
+          "auto": {
+            "type": "boolean",
+            "title": "Auto",
+            "default": true
+          },
+          "timeout": {
+            "type": "integer",
+            "title": "Timeout",
+            "default": 300
+          },
+          "agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Name"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task"
+        ],
+        "title": "StreamRunRequest"
       },
       "TestCaseCreate": {
         "properties": {
