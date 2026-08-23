@@ -1,0 +1,32 @@
+{
+  "info": {
+    "id": "ses_fd0e2fbe7ffea507EbQjAfZ7Ef",
+    "slug": "test-session",
+    "projectID": "global",
+    "directory": "C:/tmp",
+    "path": "",
+    "title": "ls and reply",
+    "agent": "build",
+    "model": { "id": "glm-5.2", "providerID": "opencode-go", "variant": "default" },
+    "version": "1.18.21",
+    "summary": { "additions": 0, "deletions": 0, "files": 0 },
+    "cost": 0.0171666,
+    "tokens": {
+      "input": 5481,
+      "output": 35,
+      "reasoning": 988,
+      "cache": { "read": 19200, "write": 0 }
+    },
+    "time": { "created": 1787496828749, "updated": 1787496847431 }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user", "time": { "created": 1787496829308 }, "agent": "build",
+        "model": { "providerID": "opencode-go", "modelID": "glm-5.2" },
+        "id": "msg_02f1d0651001user1", "sessionID": "ses_fd0e2fbe7ffea507EbQjAfZ7Ef"
+      },
+      "parts": [{ "type": "text", "text": "use the ls tool to list files", "id": "prt_u1" }]
+    }
+  ]
+}

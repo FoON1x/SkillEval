@@ -1,23 +1,15 @@
-"""opencode adapter — v1 assumption format (docs/SCHEMA.md §7, pending real samples).
+"""opencode adapter — consumes the real `opencode run --format json` JSONL stream.
 
-Expected raw JSON:
-{
-  "version": "0.1",
-  "session_id": str,
-  "skill_name": str | None,
-  "events": [
-    {"type": "session.start", "ts": iso8601},
-    {"type": "agent.start", "ts": iso8601},
-    {"type": "tool.start", "tool": str, "args": {...}, "ts": iso8601},
-    {"type": "tool.end",   "tool": str, "result": {...}, "ts": iso8601},
-    {"type": "llm.start",  "model": str | None, "input_tokens": int | None, ...},
-    {"type": "llm.end",    "output_tokens": int | None, "cost_usd": float | None, ...},
-    {"type": "agent.end",  "ts": iso8601},
-    {"type": "session.end", "ts": iso8601},
-    ...
-  ]
-}
-Unknown event types are ignored (warned).
+Real event format (opencode CLI >= 1.18): each JSONL line is
+  {"type": <str>, "timestamp": <epoch_ms>, "sessionID": <str>, "part": {...}}
+Recognized types: step_start, text, tool_use, step_finish. Unknown types are
+ignored with a ParseWarning. The batch `parse()` path accepts a dict wrapping a
+list of such lines; the incremental `TraceBuilder` path feeds lines one-by-one
+(used by the live runner). Both share one mapping core.
+
+`opencode export <sessionID>` JSON (the `export_info` arg to finalize) provides
+authoritative trace-level metadata (title, agent, model, cost, tokens) richer
+than the live stream; finalize merges it when available.
 """
 
 import datetime as dt
@@ -33,25 +25,235 @@ from skill_eval.core.schema import (
     NodeType,
     RunState,
     Trace,
+    TraceError,
     ToolCall,
+    Usage,
 )
 from skill_eval.ingest.errors import ParseError, ParseWarning
 from skill_eval.ingest.registry import BaseImporter
 
 
-def _parse_dt(value: str | None) -> dt.datetime | None:
-    if not value:
+def _from_ms(ms: int | None) -> dt.datetime | None:
+    if ms is None:
         return None
-    try:
-        return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
+    return dt.datetime.fromtimestamp(ms / 1000, tz=dt.timezone.utc)
 
 
 def _ms(start: dt.datetime | None, end: dt.datetime | None) -> int | None:
     if start and end:
         return max(0, int((end - start).total_seconds() * 1000))
     return None
+
+
+class _TraceBuilder:
+    """Incremental builder: feed real JSONL lines, finalize into a Trace.
+
+    Shared mapping core for both the batch `parse()` and live runner paths.
+    """
+
+    def __init__(self, skill_name: str | None) -> None:
+        self._skill_name = skill_name
+        self._counter = 0
+        self._session_id: str | None = None
+        self._root: Node = Node(
+            id=self._next_id(),
+            type=NodeType.SKILL_START,
+            name=skill_name or "skill",
+            started_at=None,
+            extra={"source": "opencode"},
+        )
+        self._current_step: Node | None = None
+        self._has_skill_end = False
+
+    def _next_id(self) -> str:
+        self._counter += 1
+        return f"n{self._counter}"
+
+    @property
+    def session_id(self) -> str | None:
+        return self._session_id
+
+    def feed(self, event: dict[str, Any]) -> dict[str, Any] | None:
+        """Feed one JSONL line; return a canonical event dict for SSE, or None."""
+        if not isinstance(event, dict) or "type" not in event:
+            raise ParseError(f"malformed event (expected object with 'type'): {event!r}")
+        if self._session_id is None:
+            sid = event.get("sessionID")
+            if isinstance(sid, str):
+                self._session_id = sid
+                if not self._skill_name:
+                    self._root.name = sid
+
+        kind = event["type"]
+        part = event.get("part") or {}
+        ts_ms = event.get("timestamp")
+        ts = _from_ms(ts_ms)
+
+        if kind == "step_start":
+            step = Node(
+                id=self._next_id(),
+                type=NodeType.AGENT_STEP,
+                name="step",
+                status=NodeStatus.RUNNING,
+                started_at=ts,
+            )
+            self._root.children.append(step)
+            self._current_step = step
+            if self._root.started_at is None:
+                self._root.started_at = ts
+            return {"node_type": "agent_step", "status": "running", "name": "step", "started_at": ts_ms}
+
+        if kind == "text":
+            step = self._ensure_step(ts)
+            text = part.get("text", "")
+            msg = Node(
+                id=self._next_id(),
+                type=NodeType.MESSAGE,
+                name="message",
+                status=NodeStatus.COMPLETED,
+                started_at=_from_ms((part.get("time") or {}).get("start")) or ts,
+                ended_at=_from_ms((part.get("time") or {}).get("end")),
+                output=text,
+            )
+            msg.duration_ms = _ms(msg.started_at, msg.ended_at)
+            step.children.append(msg)
+            return {"node_type": "message", "status": "completed", "text": text}
+
+        if kind == "tool_use":
+            step = self._ensure_step(ts)
+            state = part.get("state") or {}
+            tool_name = part.get("tool") or "tool"
+            time = state.get("time") or {}
+            start = _from_ms(time.get("start")) or ts
+            end = _from_ms(time.get("end"))
+            meta = state.get("metadata") or {}
+            exit_code = meta.get("exit")
+            is_error = isinstance(exit_code, int) and exit_code != 0
+            status = NodeStatus.ERROR if is_error else _status_from(state.get("status"))
+            node = Node(
+                id=self._next_id(),
+                type=NodeType.TOOL_CALL,
+                name=tool_name,
+                status=status,
+                started_at=start,
+                ended_at=end,
+                duration_ms=_ms(start, end),
+                input=state.get("input"),
+                output=state.get("output"),
+                tool=ToolCall(
+                    name=tool_name,
+                    args=state.get("input"),
+                    result=state.get("output"),
+                    meta=meta,
+                ),
+                error=TraceError(
+                    message=str(state.get("output", ""))[:500],
+                    kind=f"exit:{exit_code}",
+                ) if is_error else None,
+                extra={"title": state.get("title"), "call_id": part.get("callID")},
+            )
+            step.children.append(node)
+            return {
+                "node_type": "tool_call", "status": status.value, "name": tool_name,
+                "tool": tool_name, "exit": exit_code,
+            }
+
+        if kind == "step_finish":
+            if self._current_step is not None:
+                self._current_step.ended_at = ts
+                self._current_step.duration_ms = _ms(self._current_step.started_at, ts)
+                self._current_step.status = NodeStatus.COMPLETED
+            tokens = part.get("tokens") or {}
+            cost = part.get("cost")
+            llm = LlmUsage(
+                input_tokens=tokens.get("input"),
+                output_tokens=tokens.get("output"),
+                total_tokens=tokens.get("total"),
+                cost_usd=cost,
+            )
+            if self._current_step is not None and (llm.input_tokens or llm.total_tokens):
+                self._current_step.llm = llm
+            reason = part.get("reason")
+            if reason == "stop":
+                self._has_skill_end = True
+            return {"node_type": "step_finish", "reason": reason, "cost": cost}
+
+        warnings.warn(f"ignoring unknown opencode event type: {kind}", ParseWarning)
+        return None
+
+    def _ensure_step(self, ts: dt.datetime | None) -> Node:
+        if self._current_step is None or self._current_step.status == NodeStatus.COMPLETED:
+            step = Node(
+                id=self._next_id(),
+                type=NodeType.AGENT_STEP,
+                name="step",
+                status=NodeStatus.RUNNING,
+                started_at=ts,
+            )
+            self._root.children.append(step)
+            self._current_step = step
+        return self._current_step
+
+    def finalize(self, export_info: dict[str, Any] | None = None) -> Trace:
+        info = export_info or {}
+        started = _from_ms((info.get("time") or {}).get("created")) or self._root.started_at
+        ended = _from_ms((info.get("time") or {}).get("updated")) or self._root.ended_at
+        if ended is None and self._current_step is not None:
+            ended = self._current_step.ended_at
+        self._root.started_at = started
+        self._root.ended_at = ended
+        self._root.duration_ms = _ms(started, ended)
+
+        if self._has_skill_end:
+            self._root.children.append(
+                Node(
+                    id=self._next_id(),
+                    type=NodeType.SKILL_END,
+                    name="skill_end",
+                    ended_at=ended,
+                    duration_ms=_ms(started, ended),
+                )
+            )
+
+        usage: Usage | None = None
+        toks = info.get("tokens")
+        cost = info.get("cost")
+        if toks or cost is not None:
+            usage = Usage(
+                input_tokens=(toks or {}).get("input"),
+                output_tokens=(toks or {}).get("output"),
+                total_tokens=(toks or {}).get("input", 0) + (toks or {}).get("output", 0) or None,
+                cost_usd=cost,
+                models=[info.get("model", {}).get("id")] if info.get("model") else [],
+            )
+
+        return Trace(
+            id=str(uuid.uuid4()),
+            agent=AgentName.OPENCODE,
+            tool_version=str(info.get("version") or ""),
+            skill_name=self._skill_name,
+            session_id=self._session_id,
+            status=RunState.COMPLETED,
+            started_at=started,
+            ended_at=ended,
+            usage=usage,
+            root=self._root,
+            extra={
+                "source": "opencode",
+                "event_count": self._counter,
+                "title": info.get("title"),
+                "agent_name": info.get("agent"),
+            },
+        )
+
+
+def _status_from(raw: Any) -> NodeStatus:
+    if isinstance(raw, str):
+        try:
+            return NodeStatus(raw)
+        except ValueError:
+            return NodeStatus.COMPLETED
+    return NodeStatus.COMPLETED
 
 
 class OpencodeImporter(BaseImporter):
@@ -62,133 +264,11 @@ class OpencodeImporter(BaseImporter):
         events = data.get("events")
         if not isinstance(events, list):
             raise ParseError("missing 'events' list in opencode raw payload")
-
-        node_counter = 0
-
-        def next_id() -> str:
-            nonlocal node_counter
-            node_counter += 1
-            return f"n{node_counter}"
-
-        def parse_ts(ev: dict[str, Any]) -> dt.datetime | None:
-            return _parse_dt(ev.get("ts"))
-
-        root = Node(
-            id=next_id(),
-            type=NodeType.SKILL_START,
-            name=data.get("skill_name") or data.get("session_id") or "skill",
-            started_at=None,
-            extra={"raw_version": data.get("version")},
-        )
-
-        step: Node | None = None
-        open_tools: dict[str, Node] = {}
-        open_llms: list[Node] = []
-        session_ended = False
-
-        def ensure_step() -> Node:
-            nonlocal step
-            if step is None:
-                step = Node(id=next_id(), type=NodeType.AGENT_STEP, name="agent")
-                root.children.append(step)
-            return step
-
+        builder = _TraceBuilder(skill_name=data.get("skill_name"))
         for ev in events:
-            if not isinstance(ev, dict) or "type" not in ev:
-                raise ParseError(f"malformed event (expected object with 'type'): {ev!r}")
-            kind = ev["type"]
-            ts = parse_ts(ev)
+            builder.feed(ev)
+        export_info = data.get("export_info")
+        return builder.finalize(export_info=export_info if isinstance(export_info, dict) else None)
 
-            if kind == "session.start":
-                root.started_at = ts
-                root.ended_at = ts
-            elif kind == "agent.start":
-                ensure_step().started_at = ts
-            elif kind == "tool.start":
-                tool_name = ev.get("tool")
-                if not isinstance(tool_name, str) or not tool_name:
-                    raise ParseError(f"tool.start without 'tool' name: {ev!r}")
-                node = Node(
-                    id=next_id(),
-                    type=NodeType.TOOL_CALL,
-                    name=tool_name,
-                    status=NodeStatus.RUNNING,
-                    started_at=ts,
-                    tool=ToolCall(name=tool_name, args=ev.get("args")),
-                )
-                ensure_step().children.append(node)
-                open_tools[tool_name] = node
-            elif kind == "tool.end":
-                tool_name = ev.get("tool")
-                node = open_tools.pop(tool_name, None) if isinstance(tool_name, str) else None
-                if node is None:
-                    raise ParseError(f"tool.end without matching tool.start: {tool_name!r}")
-                node.status = NodeStatus.COMPLETED
-                node.ended_at = ts
-                node.duration_ms = _ms(node.started_at, ts)
-                assert node.tool is not None
-                node.tool.result = ev.get("result")
-                node.output = ev.get("result")
-            elif kind == "llm.start":
-                node = Node(
-                    id=next_id(),
-                    type=NodeType.LLM_CALL,
-                    name=f"llm:{ev.get('model') or 'call'}",
-                    status=NodeStatus.RUNNING,
-                    started_at=ts,
-                    llm=LlmUsage(
-                        model=ev.get("model"),
-                        input_tokens=ev.get("input_tokens"),
-                        output_tokens=ev.get("output_tokens"),
-                        cost_usd=ev.get("cost_usd"),
-                        latency_ms=ev.get("latency_ms"),
-                    ),
-                )
-                ensure_step().children.append(node)
-                open_llms.append(node)
-            elif kind == "llm.end":
-                if not open_llms:
-                    raise ParseError("llm.end without matching llm.start")
-                node = open_llms.pop()
-                node.status = NodeStatus.COMPLETED
-                node.ended_at = ts
-                node.duration_ms = _ms(node.started_at, ts)
-                assert node.llm is not None
-                usage = node.llm
-                for field in ("input_tokens", "output_tokens", "cost_usd", "latency_ms"):
-                    value = ev.get(field)
-                    if getattr(usage, field) is None and value is not None:
-                        setattr(usage, field, value)
-                usage.total_tokens = (usage.input_tokens or 0) + (usage.output_tokens or 0) or None
-            elif kind == "agent.end":
-                if step is not None:
-                    step.ended_at = ts
-                    step.duration_ms = _ms(step.started_at, ts)
-            elif kind == "session.end":
-                root.ended_at = ts
-                root.duration_ms = _ms(root.started_at, ts)
-                session_ended = True
-            else:
-                warnings.warn(f"ignoring unknown opencode event type: {kind}", ParseWarning)
-
-        for node in open_tools.values():
-            node.status = NodeStatus.RUNNING
-
-        running = bool(open_tools) or bool(open_llms) or not session_ended
-        if not running:
-            end = Node(id=next_id(), type=NodeType.SKILL_END, name="skill_end",
-                       ended_at=root.ended_at, duration_ms=_ms(root.ended_at, root.started_at))
-            root.children.append(end)
-
-        return Trace(
-            id=str(uuid.uuid4()),
-            agent=AgentName.OPENCODE,
-            tool_version=str(data.get("version") or ""),
-            skill_name=data.get("skill_name"),
-            session_id=data.get("session_id"),
-            status=RunState.RUNNING if running else RunState.COMPLETED,
-            started_at=root.started_at,
-            ended_at=None if running else root.ended_at,
-            root=root,
-            extra={"source": "opencode", "event_count": len(events)},
-        )
+    def new_builder(self, skill_name: str | None) -> _TraceBuilder:
+        return _TraceBuilder(skill_name=skill_name)
