@@ -1,6 +1,7 @@
 """Runner abstraction: headless agent execution -> canonical Trace."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -16,6 +17,11 @@ class RunContext(BaseModel):
     task: str
     session_id: str | None = None
     cwd: str | None = None
+    skill_name: str | None = None
+    auto: bool = True
+    timeout: int = 300
+    agent_name: str | None = None
+    model: str | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -24,8 +30,8 @@ class BaseRunner(ABC):
     binary: str = ""
 
     @abstractmethod
-    def run(self, context: RunContext) -> Trace:
-        """Execute the agent headless for the given task and return its Trace."""
+    def run_stream(self, context: RunContext, emit: Callable[[dict[str, Any]], None]) -> Trace:
+        """Execute the agent headless for the given task, emitting live events, return its Trace."""
 
     def available(self) -> bool:
         """Whether the agent CLI is available on this machine (overridable)."""

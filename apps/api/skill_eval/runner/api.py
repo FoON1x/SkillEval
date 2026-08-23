@@ -23,7 +23,9 @@ def run_agent(req: RunRequest) -> dict[str, object]:
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=f"unknown agent: {exc}") from exc
     try:
-        trace: Trace = runner.run(RunContext(task=req.task, session_id=req.session_id))
+        trace: Trace = runner.run_stream(
+            RunContext(task=req.task, session_id=req.session_id), emit=lambda _c: None
+        )
     except RunnerUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except NotImplementedError as exc:
