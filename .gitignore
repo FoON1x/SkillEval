@@ -21,6 +21,7 @@ blob-report/
 *.local
 data/
 *.db
+.run/
 
 # Editor / OS
 .vscode/
