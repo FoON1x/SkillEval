@@ -1,40 +1,42 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import ThemeToggle from './theme/ThemeToggle'
+import { ToastContainer } from './components/ui'
 
-const nav = [
-  { to: '/traces', label: 'Traces' },
-  { to: '/run', label: '运行' },
-  { to: '/test-cases', label: 'Test Cases' },
-  { to: '/eval-runs', label: 'Eval Runs' },
-  { to: '/diff', label: 'Diff' },
+const NAV = [
+  { to: '/traces', label: '运行记录' },
+  { to: '/run', label: '运行 Skill' },
+  { to: '/test-cases', label: '测试用例' },
+  { to: '/eval-runs', label: '评测记录' },
+  { to: '/diff', label: 'Trace 对比' },
 ]
 
 export default function App() {
   return (
-    <div className="flex h-screen">
-      <aside className="w-56 shrink-0 border-r border-line bg-surface flex flex-col">
-        <h1 className="px-5 pt-6 pb-4 text-lg font-semibold tracking-tight">SkillEval</h1>
-        <nav className="flex flex-col gap-1 px-3">
-          {nav.map((item) => (
+    <ToastContainer>
+      <div className="flex min-h-screen">
+        <aside className="sticky top-0 flex h-screen w-56 flex-col gap-1 border-r border-line bg-surface p-3">
+          <div className="mb-4 flex items-center gap-2 px-2 text-base font-bold">
+            <span className="h-2.5 w-2.5 rounded-sm bg-accent" /> SkillEval
+          </div>
+          {NAV.map((n) => (
             <NavLink
-              key={item.to}
-              to={item.to}
+              key={n.to}
+              to={n.to}
               className={({ isActive }) =>
-                `rounded-md px-3 py-2 text-sm transition-colors ${
-                  isActive
-                    ? 'bg-accent-soft text-ink font-medium'
-                    : 'text-muted hover:bg-canvas hover:text-ink'
-                }`
+                `rounded-md px-3 py-2 text-sm ${isActive ? 'bg-accent-soft font-semibold text-accent' : 'text-muted hover:bg-surface-2 hover:text-ink'}`
               }
             >
-              {item.label}
+              {n.label}
             </NavLink>
           ))}
-        </nav>
-        <p className="mt-auto px-5 py-4 text-xs text-faint">AI Agent / Skill 测试与 Trace 可视化</p>
-      </aside>
-      <main className="flex-1 overflow-auto">
-        <Outlet />
-      </main>
-    </div>
+          <div className="mt-auto">
+            <ThemeToggle />
+          </div>
+        </aside>
+        <main className="flex-1">
+          <Outlet />
+        </main>
+      </div>
+    </ToastContainer>
   )
 }
