@@ -14,6 +14,13 @@ describe('Modal', () => {
     render(<Modal open={true} onClose={fn} title="选目录">树内容</Modal>)
     expect(screen.getByText('树内容')).toBeInTheDocument()
     fireEvent.click(screen.getByText('树内容').parentElement!.parentElement!)
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+  it('does not call onClose when clicking inside the panel', () => {
+    const fn = vi.fn()
+    render(<Modal open={true} onClose={fn} title="选目录">树内容</Modal>)
+    fireEvent.click(screen.getByText('树内容').parentElement!)
+    expect(fn).not.toHaveBeenCalled()
   })
   it('calls onClose on Escape', () => {
     const fn = vi.fn()
