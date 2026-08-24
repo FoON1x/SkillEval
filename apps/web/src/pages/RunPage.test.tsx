@@ -18,6 +18,7 @@ function mockFetch(
   skills = [{ name: 'xlsx', description: 'spreadsheet', source: 'a' }],
   models: { provider: string; model: string; id: string }[] = [],
   browseByPath: Record<string, { path: string; entries: { name: string; type: string; path: string }[] }> = {},
+  pending = false,
 ) {
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (String(url).includes('/api/runner/skills') && (!init || init.method === undefined)) {
@@ -45,14 +46,26 @@ function mockFetch(
       return new Response('not found', { status: 404 })
     }
     if (String(url).includes('/api/runner/run/stream')) {
+      const encoder = new TextEncoder()
+      let rejectRead: ((reason: unknown) => void) | null = null
       const stream = new ReadableStream({
         start(controller) {
-          const encoder = new TextEncoder()
-          for (const frame of sseFrames) {
-            controller.enqueue(encoder.encode(frame))
+          if (!pending) {
+            for (const frame of sseFrames) {
+              controller.enqueue(encoder.encode(frame))
+            }
+            controller.close()
           }
-          controller.close()
         },
+        pull() {
+          if (!pending) return
+          return new Promise((_, reject) => {
+            rejectRead = reject
+          })
+        },
+      })
+      init?.signal?.addEventListener('abort', () => {
+        rejectRead?.(new DOMException('Aborted', 'AbortError'))
       })
       return new Response(stream, {
         status: 200,
@@ -223,5 +236,33 @@ describe('RunPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '选择此目录' }))
     expect((screen.getByLabelText('工作目录') as HTMLInputElement).value).toBe('C:/demo/src')
+  })
+
+  it('stops a running stream and reverts the button', async () => {
+    globalThis.fetch = mockFetch([], undefined, undefined, undefined, true) as unknown as typeof globalThis.fetch
+    const { Tracker, get } = lastPath()
+    render(
+      <MemoryRouter initialEntries={['/run']}>
+        <Routes>
+          <Route path="/run" element={<RunPage />} />
+          <Route path="*" element={<Tracker />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await waitFor(() => expect(screen.getByRole('option', { name: 'xlsx' })).toBeInTheDocument())
+
+    fireEvent.change(screen.getByPlaceholderText(/输入要执行的 Prompt/i), { target: { value: 'list files' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /运行/i }))
+    })
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '停止' })).toBeInTheDocument())
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '停止' }))
+    })
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '运行' })).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: '停止' })).not.toBeInTheDocument()
+    expect(get()).toBe('/run')
   })
 })

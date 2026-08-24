@@ -1,6 +1,6 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, BASE } from '../api/client'
+import { api, postStream } from '../api/client'
 import { Button, Card, Field, Input, Modal, Select, Spinner, Textarea } from '../components/ui'
 import { Model, groupByProvider, buildModelId } from '../utils/models'
 
@@ -51,6 +51,7 @@ export default function RunPage() {
   const [entries, setEntries] = useState<FsEntry[]>([])
   const [browseLoading, setBrowseLoading] = useState(false)
   const [browseError, setBrowseError] = useState<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     api
@@ -61,6 +62,9 @@ export default function RunPage() {
       .get<{ models: Model[] }>('/api/runner/models')
       .then((b) => setModels(b.models))
       .catch(() => setModels([]))
+    return () => {
+      abortRef.current?.abort()
+    }
   }, [])
 
   async function submit(e: FormEvent) {
@@ -76,12 +80,13 @@ export default function RunPage() {
         : prompt
     const model = provider && modelId ? buildModelId(provider, modelId) : null
 
-    let resp: Response
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+
     try {
-      resp = await fetch(`${BASE}/api/runner/run/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      await postStream(
+        '/api/runner/run/stream',
+        {
           agent: 'opencode',
           task,
           skill_name: skillName && skillName !== '__none__' ? skillName : null,
@@ -89,57 +94,27 @@ export default function RunPage() {
           auto,
           agent_name: agentName,
           model,
-        }),
-      })
+        },
+        {
+          onEvent: (n) => setEvents((prev) => [...prev, n as StreamEvent['node']]),
+          onDone: (id) => {
+            setRunning(false)
+            navigate(`/traces/${id}`)
+          },
+          onError: (m) => {
+            setError(m)
+            setRunning(false)
+          },
+          signal: ctrl.signal,
+        },
+      )
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
       setError(err instanceof Error ? err.message : '请求失败')
+    } finally {
       setRunning(false)
-      return
+      abortRef.current = null
     }
-
-    if (!resp.ok || !resp.body) {
-      setError(`HTTP ${resp.status}`)
-      setRunning(false)
-      return
-    }
-
-    const reader = resp.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-
-    async function processStream() {
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        let idx: number
-        while ((idx = buffer.indexOf('\n\n')) >= 0) {
-          const frame = buffer.slice(0, idx).trim()
-          buffer = buffer.slice(idx + 2)
-          if (!frame.startsWith('data: ')) continue
-          let data: StreamEvent
-          try {
-            data = JSON.parse(frame.slice(6))
-          } catch {
-            continue
-          }
-          if (data.type === 'event' && data.node) {
-            setEvents((prev) => [...prev, data.node!])
-          } else if (data.type === 'done' && data.trace_id) {
-            setRunning(false)
-            navigate(`/traces/${data.trace_id}`)
-            return
-          } else if (data.type === 'error') {
-            setError(data.message ?? '运行失败')
-            setRunning(false)
-            return
-          }
-        }
-      }
-      setRunning(false)
-    }
-
-    processStream()
   }
 
   async function loadDir(path: string | null) {
@@ -194,14 +169,19 @@ export default function RunPage() {
           <h2 className="text-2xl font-semibold tracking-tight">运行 Skill</h2>
           <p className="text-sm text-muted">通过 opencode CLI 运行并实时抓取 Trace</p>
         </div>
-        <Button
-          type="submit"
-          form="run-form"
-          loading={running}
-          disabled={!prompt.trim()}
-        >
-          {running ? '运行中…' : '运行'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="submit"
+            form="run-form"
+            loading={running}
+            disabled={!prompt.trim()}
+          >
+            {running ? '运行中…' : '运行'}
+          </Button>
+          {running && (
+            <Button variant="ghost" onClick={() => abortRef.current?.abort()}>停止</Button>
+          )}
+        </div>
       </div>
 
       <Card className="mb-6">
