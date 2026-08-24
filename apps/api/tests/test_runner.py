@@ -260,6 +260,26 @@ class TestOpencodeRunner:
         assert any(e.get("node_type") == "warning" for e in emitted)
         assert trace.tool_names() == ["bash"]
 
+    def test_run_stream_forwards_model_flag_into_cmd(self, monkeypatch: pytest.MonkeyPatch):
+        captured: list[list[str]] = []
+
+        class _CmdCaptureProc(_FakeProc):
+            def __init__(self, lines: list[str]) -> None:
+                super().__init__(lines)
+
+        def _capture_popen(cmd, *a, **kw):
+            captured.append(cmd)
+            return _CmdCaptureProc(JSONL_LINES)
+
+        monkeypatch.setattr(shutil, "which", lambda b: "/fake/opencode")
+        monkeypatch.setattr("skill_eval.runner.opencode.subprocess.Popen", _capture_popen)
+        monkeypatch.setattr("skill_eval.runner.opencode._run_export", lambda sid: EXPORT_JSON["info"])
+        runner = OpencodeRunner()
+        ctx = RunContext(task="hi", model="opencode-go/glm-5.2")
+        runner.run_stream(ctx, emit=lambda _c: None)
+        assert "--model" in captured[0]
+        assert "opencode-go/glm-5.2" in captured[0]
+
 
 class TestRunnerApi:
     def _client(self) -> TestClient:
