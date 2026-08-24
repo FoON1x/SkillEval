@@ -196,6 +196,29 @@
         }
       }
     },
+    "/api/runner/models": {
+      "get": {
+        "tags": [
+          "runner"
+        ],
+        "summary": "Get Models",
+        "operationId": "get_models_api_runner_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Models Api Runner Models Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/traces": {
       "get": {
         "tags": [
@@ -957,6 +980,57 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Judge Process Api Judge Process Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/fs/browse": {
+      "get": {
+        "tags": [
+          "fs"
+        ],
+        "summary": "Get Browse",
+        "operationId": "get_browse_api_fs_browse_get",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Browse Api Fs Browse Get"
                 }
               }
             }
