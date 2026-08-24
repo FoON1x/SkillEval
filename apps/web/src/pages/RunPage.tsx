@@ -191,6 +191,7 @@ export default function RunPage() {
               id="run-skill"
               value={skillName}
               onChange={(e) => setSkillName(e.target.value)}
+              className="w-full"
             >
               <option value="__none__">（无 / 普通 Prompt）</option>
               {skills.map((s) => (
@@ -205,6 +206,7 @@ export default function RunPage() {
               id="run-agent"
               value={agentName}
               onChange={(e) => setAgentName(e.target.value)}
+              className="w-full"
             >
               {AGENTS.map((a) => (
                 <option key={a} value={a}>
@@ -221,6 +223,7 @@ export default function RunPage() {
                 setProvider(e.target.value)
                 setModelId('')
               }}
+              className="w-full"
             >
               <option value="">默认（由 opencode 决定）</option>
               {Object.keys(groupByProvider(models)).map((p) => (
@@ -236,6 +239,7 @@ export default function RunPage() {
               value={modelId}
               disabled={!provider || !groupByProvider(models)[provider]?.length}
               onChange={(e) => setModelId(e.target.value)}
+              className="w-full"
             >
               {!provider || !groupByProvider(models)[provider]?.length ? (
                 <option value="">选择提供商</option>

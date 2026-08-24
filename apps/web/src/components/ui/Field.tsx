@@ -8,9 +8,9 @@ interface Props extends ComponentPropsWithoutRef<'div'> {
   children: ReactNode
 }
 
-export default function Field({ label, hint, optional, htmlFor, children, ...rest }: Props) {
+export default function Field({ label, hint, optional, htmlFor, children, className = '', ...rest }: Props) {
   return (
-    <div {...rest} className="flex flex-col gap-1">
+    <div {...rest} className={`flex flex-col gap-1 ${className}`}>
       <label htmlFor={htmlFor} className="flex items-center gap-1.5 text-xs font-semibold text-ink">
         {label}{optional && <span className="text-xs font-normal text-faint">可选</span>}
       </label>

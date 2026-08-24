@@ -10,6 +10,6 @@ interface Props extends ComponentPropsWithoutRef<'span'> {
   tone?: Tone
 }
 
-export default function Badge({ tone = 'neutral', children, ...rest }: Props) {
-  return <span {...rest} role="status" className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${TONES[tone]}`}>{children}</span>
+export default function Badge({ tone = 'neutral', className = '', children, ...rest }: Props) {
+  return <span {...rest} role="status" className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${TONES[tone]} ${className}`}>{children}</span>
 }

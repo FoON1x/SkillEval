@@ -3,7 +3,7 @@ const CHEVRON = "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/200
 export default function Select({ className = '', children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <div className="relative">
-      <select {...rest} className={`w-full appearance-none rounded-md border border-line-strong bg-surface px-3 py-1.5 pr-8 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft ${className}`}>
+      <select {...rest} className={`appearance-none rounded-md border border-line-strong bg-surface px-3 py-1.5 pr-8 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-soft ${className}`}>
         {children}
       </select>
       <span

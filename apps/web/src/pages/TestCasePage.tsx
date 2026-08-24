@@ -132,6 +132,7 @@ export default function TestCasePage() {
             <Select
               value={form.agent}
               onChange={(e) => setForm({ ...form, agent: e.target.value })}
+              className="w-full"
             >
               <option value="opencode">opencode</option>
               <option value="codex">codex</option>
@@ -141,6 +142,7 @@ export default function TestCasePage() {
             <Select
               value={form.rule}
               onChange={(e) => setForm({ ...form, rule: e.target.value })}
+              className="w-full"
             >
               {RULES.map((r) => (
                 <option key={r} value={r}>

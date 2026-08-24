@@ -70,7 +70,7 @@ export default function DiffPage() {
       <div className="mb-6 grid grid-cols-2 gap-4">
         <label className="flex flex-col gap-1 text-xs text-muted">
           基线 Trace
-          <Select value={from} onChange={(e) => setFrom(e.target.value)}>
+          <Select value={from} onChange={(e) => setFrom(e.target.value)} className="w-full">
             <option value="">选择…</option>
             {traces.map((t) => (
               <option key={t.id} value={t.id}>
@@ -81,7 +81,7 @@ export default function DiffPage() {
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted">
           对比 Trace
-          <Select value={to} onChange={(e) => setTo(e.target.value)}>
+          <Select value={to} onChange={(e) => setTo(e.target.value)} className="w-full">
             <option value="">选择…</option>
             {traces
               .filter((t) => t.id !== from)
