@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
+import { Badge, Card, EmptyState } from '../components/ui'
 
 interface EvalRun {
   id: string
@@ -12,11 +13,11 @@ interface EvalRun {
   created_at: string
 }
 
-const badge: Record<string, string> = {
-  passed: 'bg-ok/10 text-ok',
-  failed: 'bg-bad/10 text-bad',
-  review: 'bg-wait/10 text-wait',
-  error: 'bg-skip/10 text-faint',
+const resultTone: Record<string, 'ok' | 'bad' | 'wait' | 'skip'> = {
+  passed: 'ok',
+  failed: 'bad',
+  review: 'wait',
+  error: 'skip',
 }
 
 export default function EvalRunsPage() {
@@ -29,18 +30,16 @@ export default function EvalRunsPage() {
 
   return (
     <div className="mx-auto max-w-5xl p-8">
-      <h2 className="mb-1 text-2xl font-semibold tracking-tight">Eval Runs</h2>
+      <h2 className="mb-1 text-2xl font-semibold tracking-tight">评测记录</h2>
       <p className="mb-6 text-sm text-muted">{items.length} 条评测记录（规则评测与 LLM 评测）</p>
 
       <div className="flex flex-col gap-3">
         {items.map((run) => (
-          <div key={run.id} className="rounded-xl border border-line bg-surface p-4">
+          <Card key={run.id}>
             <button className="flex w-full items-center justify-between text-left" onClick={() => setOpenId(openId === run.id ? null : run.id)}>
               <div className="flex items-center gap-3">
-                <span className={`rounded-full px-2 py-0.5 text-xs ${badge[run.result] ?? 'bg-skip/10 text-faint'}`}>
-                  {run.result}
-                </span>
-                <span className="rounded bg-canvas px-1.5 py-0.5 text-xs text-muted">{run.rule}</span>
+                <Badge tone={resultTone[run.result] ?? 'skip'}>{run.result}</Badge>
+                <Badge tone="neutral">{run.rule}</Badge>
                 {run.score != null && (
                   <span className="text-sm tabular-nums text-muted">score {run.score.toFixed(2)}</span>
                 )}
@@ -54,9 +53,9 @@ export default function EvalRunsPage() {
                 {JSON.stringify(run.details, null, 2)}
               </pre>
             )}
-          </div>
+          </Card>
         ))}
-        {items.length === 0 && <p className="py-10 text-center text-muted">暂无评测记录。</p>}
+        {items.length === 0 && <EmptyState title="暂无评测记录。" />}
       </div>
     </div>
   )
