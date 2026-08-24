@@ -401,6 +401,19 @@ class TestModelsApi:
 
         assert list_models() == []
 
+    def test_models_empty_when_cli_times_out(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import skill_eval.runner.models as m
+
+        monkeypatch.setattr(shutil, "which", lambda b: "/fake/opencode")
+
+        def _timeout(*args, **kwargs):
+            raise subprocess.TimeoutExpired(cmd="opencode", timeout=30)
+
+        monkeypatch.setattr(m.subprocess, "run", _timeout)
+        from skill_eval.runner.models import list_models
+
+        assert list_models() == []
+
     def test_models_endpoint(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import skill_eval.runner.models as m
 

@@ -13,7 +13,7 @@ def list_models() -> list[dict[str, Any]]:
             ["opencode", "models", "--verbose"],
             capture_output=True, text=True, timeout=30,
         )
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         return []
     if proc.returncode != 0:
         return []
