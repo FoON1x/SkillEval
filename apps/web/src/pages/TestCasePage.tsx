@@ -170,45 +170,41 @@ export default function TestCasePage() {
 
       <div className="flex flex-col gap-3">
         {items.map((tc) => (
-          <div key={tc.id} data-testid="case-item">
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{tc.name}</p>
-                  <p className="text-xs text-muted">
-                    {tc.agent} · rule={tc.rule} · 期望 {tc.expected.tools.join(', ') || '（空）'} ·{' '}
-                    {tc.assertions.length} 条断言
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {lastRun?.caseId === tc.id && (
-                    <span data-testid="eval-result">
-                      <Badge tone={resultTone[lastRun.result] ?? 'skip'}>
-                        {lastRun.result}
-                        {lastRun.score != null ? ` · ${lastRun.score.toFixed(2)}` : ''}
-                        {lastRun.error ? ` · ${lastRun.error}` : ''}
-                      </Badge>
-                    </span>
-                  )}
-                  <Button variant="ghost" size="sm" onClick={() => runEval(tc)}>
-                    运行评测
-                  </Button>
-                  <Button variant="danger" size="sm" onClick={() => remove(tc)}>
-                    删除
-                  </Button>
-                </div>
+          <Card key={tc.id} data-testid="case-item">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">{tc.name}</p>
+                <p className="text-xs text-muted">
+                  {tc.agent} · rule={tc.rule} · 期望 {tc.expected.tools.join(', ') || '（空）'} ·{' '}
+                  {tc.assertions.length} 条断言
+                </p>
               </div>
-              {tc.assertions.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {tc.assertions.map((a, i) => (
-                    <code key={i} className="rounded bg-canvas px-1.5 py-0.5 text-xs text-muted">
-                      {a.code}
-                    </code>
-                  ))}
-                </div>
-              )}
-            </Card>
-          </div>
+              <div className="flex items-center gap-2">
+                {lastRun?.caseId === tc.id && (
+                  <Badge data-testid="eval-result" tone={resultTone[lastRun.result] ?? 'skip'}>
+                    {lastRun.result}
+                    {lastRun.score != null ? ` · ${lastRun.score.toFixed(2)}` : ''}
+                    {lastRun.error ? ` · ${lastRun.error}` : ''}
+                  </Badge>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => runEval(tc)}>
+                  运行评测
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => remove(tc)}>
+                  删除
+                </Button>
+              </div>
+            </div>
+            {tc.assertions.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {tc.assertions.map((a, i) => (
+                  <code key={i} className="rounded bg-canvas px-1.5 py-0.5 text-xs text-muted">
+                    {a.code}
+                  </code>
+                ))}
+              </div>
+            )}
+          </Card>
         ))}
         {items.length === 0 && !creating && <EmptyState title="暂无用例，点击右上角新建。" />}
       </div>
