@@ -89,7 +89,7 @@ describe('RunPage', () => {
     )
     await waitFor(() => expect(screen.getByRole('option', { name: 'xlsx' })).toBeInTheDocument())
 
-    fireEvent.change(screen.getByPlaceholderText(/输入要执行的 prompt/i), { target: { value: 'list files' } })
+    fireEvent.change(screen.getByPlaceholderText(/输入要执行的 Prompt/i), { target: { value: 'list files' } })
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /运行/i }))
     })
@@ -113,7 +113,7 @@ describe('RunPage', () => {
     )
     await waitFor(() => expect(screen.getByRole('option', { name: 'xlsx' })).toBeInTheDocument())
 
-    fireEvent.change(screen.getByPlaceholderText(/输入要执行的 prompt/i), { target: { value: 'list files' } })
+    fireEvent.change(screen.getByPlaceholderText(/输入要执行的 Prompt/i), { target: { value: 'list files' } })
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /运行/i }))
     })
@@ -134,7 +134,7 @@ describe('RunPage', () => {
     )
     await waitFor(() => expect(screen.getByRole('option', { name: 'xlsx' })).toBeInTheDocument())
 
-    fireEvent.change(screen.getByPlaceholderText(/输入要执行的 prompt/i), { target: { value: 'hi' } })
+    fireEvent.change(screen.getByPlaceholderText(/输入要执行的 Prompt/i), { target: { value: 'hi' } })
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /运行/i }))
     })
