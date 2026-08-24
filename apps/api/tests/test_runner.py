@@ -73,6 +73,12 @@ class _FakeProc:
         self.killed = True
 
 
+class _StubOut:
+    def __init__(self, stdout: str = "", returncode: int = 0) -> None:
+        self.stdout = stdout
+        self.returncode = returncode
+
+
 class _SlowFakeProc(_FakeProc):
     """A proc whose stdout never ends — simulates an ever-streaming runaway process."""
 
@@ -366,3 +372,41 @@ class TestSkillsApi:
         resp = self._client().get("/api/runner/skills")
         assert resp.status_code == 200
         assert resp.json()["skills"] == []
+
+
+class TestModelsApi:
+    def _client(self) -> TestClient:
+        from skill_eval.app import create_app
+        from skill_eval.store.repository import Store
+
+        return TestClient(create_app(store=Store.in_memory()))
+
+    def test_lists_models_from_cli(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        sample = "opencode-go/glm-5.2\nanthropic/claude-opus-4-6\n"
+        import skill_eval.runner.models as m
+
+        monkeypatch.setattr(shutil, "which", lambda b: "/fake/opencode")
+        monkeypatch.setattr(m.subprocess, "run", lambda *a, **kw: _StubOut(stdout=sample))
+        from skill_eval.runner.models import list_models
+
+        out = list_models()
+        assert out[0]["provider"] == "opencode-go"
+        assert out[0]["model"] == "glm-5.2"
+        assert out[0]["id"] == "opencode-go/glm-5.2"
+        assert out[1]["provider"] == "anthropic"
+
+    def test_models_empty_when_cli_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(shutil, "which", lambda b: None)
+        from skill_eval.runner.models import list_models
+
+        assert list_models() == []
+
+    def test_models_endpoint(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import skill_eval.runner.models as m
+
+        monkeypatch.setattr(shutil, "which", lambda b: "/fake/opencode")
+        monkeypatch.setattr(m.subprocess, "run", lambda *a, **kw: _StubOut(stdout="opencode-go/glm-5.2\n"))
+        r = self._client().get("/api/runner/models")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["models"][0]["id"] == "opencode-go/glm-5.2"

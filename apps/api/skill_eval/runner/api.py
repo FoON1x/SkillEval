@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from skill_eval.core.schema import Trace
 from skill_eval.runner.base import RunContext, RunnerUnavailableError
+from skill_eval.runner.models import list_models
 from skill_eval.runner.registry import get_runner_registry
 from skill_eval.runner.skills import list_skills
 
@@ -114,3 +115,8 @@ def run_stream(req: StreamRunRequest, request: Request) -> StreamingResponse:
 @router.get("/skills")
 def get_skills() -> dict[str, object]:
     return {"skills": list_skills()}
+
+
+@router.get("/models")
+def get_models() -> dict[str, object]:
+    return {"models": list_models()}
