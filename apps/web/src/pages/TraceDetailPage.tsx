@@ -6,6 +6,7 @@ import DetailPanel from '../components/DetailPanel'
 import Timeline from '../components/Timeline'
 import TraceDag from '../components/TraceDag'
 import { flattenTree, type TraceLike } from '../utils/trace'
+import { Badge, Button, Card, EmptyState, Spinner } from '../components/ui'
 
 interface JudgeReport {
   score: number
@@ -13,6 +14,18 @@ interface JudgeReport {
   summary: string
   findings: string[]
   raw?: string | null
+}
+
+const statusTone: Record<string, 'ok' | 'bad' | 'wait' | 'skip' | 'neutral'> = {
+  completed: 'ok',
+  running: 'wait',
+  error: 'bad',
+  skipped: 'skip',
+}
+
+const verdictTone: Record<string, 'ok' | 'bad' | 'skip'> = {
+  pass: 'ok',
+  fail: 'bad',
 }
 
 export default function TraceDetailPage() {
@@ -50,7 +63,7 @@ export default function TraceDetailPage() {
       const body = await api.post<{ report: JudgeReport }>(`/api/judge/${kind}`, { trace_id: id })
       setJudge({ kind, report: body.report })
     } catch (e) {
-      const msg = e instanceof ApiError ? e.message : 'judge failed'
+      const msg = e instanceof ApiError ? e.message : '评测失败'
       setJudge({ kind, report: { score: 0, verdict: 'review', summary: msg, findings: [] } })
     } finally {
       setJudgeBusy(false)
@@ -59,75 +72,73 @@ export default function TraceDetailPage() {
 
   if (notFound) {
     return (
-      <div className="p-10 text-muted">
-        Trace 不存在。 <Link to="/traces" className="text-accent">返回列表</Link>
+      <EmptyState
+        title="Trace 不存在。"
+        action={
+          <Link to="/traces" className="text-sm text-accent">
+            返回列表
+          </Link>
+        }
+      />
+    )
+  }
+  if (!trace) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-16 text-muted">
+        <Spinner size={20} />
+        <span>加载中…</span>
       </div>
     )
   }
-  if (!trace) return <div className="p-10 text-muted">加载中…</div>
 
   return (
     <div className="p-8">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <Link to="/traces" className="text-xs text-muted hover:text-ink">← Traces</Link>
+          <Link to="/traces" className="text-xs text-muted hover:text-ink">← 运行记录</Link>
           <h2 className="mt-1 text-2xl font-semibold tracking-tight">
             {trace.skill_name ?? trace.id.slice(0, 8)}
             <span className="ml-3 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-normal text-accent">
               {trace.agent}
             </span>
-            <span className="ml-2 rounded-full bg-canvas px-2 py-0.5 text-xs font-normal text-muted">
-              {trace.status}
+            <span className="ml-2">
+              <Badge tone={statusTone[trace.status] ?? 'neutral'}>{trace.status}</Badge>
             </span>
           </h2>
         </div>
         <div className="flex gap-2">
           <Link
             to={`/diff?from=${trace.id}`}
-            className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm hover:border-accent hover:text-accent"
+            className="inline-flex items-center gap-1.5 rounded-md border border-line-strong px-4 py-1.5 text-sm font-semibold text-muted transition hover:border-ink hover:text-ink"
           >
             Diff 对比
           </Link>
-          <button
-            onClick={() => runJudge('result')}
-            disabled={judgeBusy}
-            className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm hover:border-accent hover:text-accent disabled:opacity-50"
-          >
+          <Button variant="ghost" onClick={() => runJudge('result')} loading={judgeBusy}>
             LLM 结果级
-          </button>
-          <button
-            onClick={() => runJudge('process')}
-            disabled={judgeBusy}
-            className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm hover:border-accent hover:text-accent disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="ghost" onClick={() => runJudge('process')} loading={judgeBusy}>
             LLM 全过程
-          </button>
+          </Button>
         </div>
       </div>
 
       {judge && (
-        <div className="mb-4 rounded-xl border border-line bg-surface p-4" data-testid="judge-result">
-          <div className="flex items-center gap-3">
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs ${
-                judge.report.verdict === 'pass'
-                  ? 'bg-ok/10 text-ok'
-                  : judge.report.verdict === 'fail'
-                    ? 'bg-bad/10 text-bad'
-                    : 'bg-skip/10 text-faint'
-              }`}
-            >
-              {judge.kind} · {judge.report.verdict} · score {judge.report.score.toFixed(2)}
-            </span>
-            <span className="text-sm text-muted">{judge.report.summary}</span>
-          </div>
-          {judge.report.findings.length > 0 && (
-            <ul className="mt-2 list-disc pl-5 text-xs text-muted">
-              {judge.report.findings.map((f, i) => (
-                <li key={i}>{f}</li>
-              ))}
-            </ul>
-          )}
+        <div data-testid="judge-result">
+          <Card className="mb-4">
+            <div className="flex items-center gap-3">
+              <Badge tone={verdictTone[judge.report.verdict] ?? 'skip'}>
+                {judge.kind} · {judge.report.verdict} · score {judge.report.score.toFixed(2)}
+              </Badge>
+              <span className="text-sm text-muted">{judge.report.summary}</span>
+            </div>
+            {judge.report.findings.length > 0 && (
+              <ul className="mt-2 list-disc pl-5 text-xs text-muted">
+                {judge.report.findings.map((f, i) => (
+                  <li key={i}>{f}</li>
+                ))}
+              </ul>
+            )}
+          </Card>
         </div>
       )}
 
