@@ -1,7 +1,7 @@
 """Runner HTTP endpoints: trigger headless agent runs (sync + live SSE stream) + skill list."""
 
+import asyncio
 import json
-import queue
 import threading
 
 from fastapi import APIRouter, HTTPException, Request
@@ -70,29 +70,35 @@ def run_stream(req: StreamRunRequest, request: Request) -> StreamingResponse:
         skill_name=req.skill_name,
         cwd=req.cwd,
         auto=req.auto,
-        timeout=req.timeout,
+        timeout=min(max(req.timeout, 1), 3600),
         agent_name=req.agent_name,
         model=req.model,
     )
     store = request.app.state.store
 
-    def event_stream():
-        q: queue.Queue[tuple[str, object]] = queue.Queue()
+    async def event_stream():
+        q: asyncio.Queue[tuple[str, object]] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
 
         def emit(canon: dict) -> None:
-            q.put(("event", canon))
+            loop.call_soon_threadsafe(q.put_nowait, ("event", canon))
 
         def worker() -> None:
             try:
                 trace = runner.run_stream(ctx, emit=emit)
                 store.save_trace(trace)
-                q.put(("done", trace.id))
+                loop.call_soon_threadsafe(q.put_nowait, ("done", trace.id))
             except Exception as exc:
-                q.put(("error", str(exc)))
+                loop.call_soon_threadsafe(q.put_nowait, ("error", str(exc)))
 
         threading.Thread(target=worker, daemon=True).start()
         while True:
-            kind, payload = q.get()
+            try:
+                kind, payload = await asyncio.wait_for(q.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                if await request.is_disconnected():
+                    break
+                continue
             if kind == "event":
                 yield _sse({"type": "event", "node": payload})
             elif kind == "done":

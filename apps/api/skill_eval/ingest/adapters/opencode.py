@@ -219,10 +219,13 @@ class _TraceBuilder:
         toks = info.get("tokens")
         cost = info.get("cost")
         if toks or cost is not None:
+            in_t = (toks or {}).get("input")
+            out_t = (toks or {}).get("output")
+            total = (int(in_t) if in_t is not None else 0) + (int(out_t) if out_t is not None else 0)
             usage = Usage(
-                input_tokens=(toks or {}).get("input"),
-                output_tokens=(toks or {}).get("output"),
-                total_tokens=(toks or {}).get("input", 0) + (toks or {}).get("output", 0) or None,
+                input_tokens=in_t,
+                output_tokens=out_t,
+                total_tokens=total or None,
                 cost_usd=cost,
                 models=[info.get("model", {}).get("id")] if info.get("model") else [],
             )

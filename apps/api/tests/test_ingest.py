@@ -223,6 +223,39 @@ class TestOpencodeTraceBuilder:
         assert trace.usage is None or trace.usage.cost_usd is None
         assert trace.tool_names() == ["bash"]
 
+    def test_finalize_with_null_token_fields_does_not_crash(self) -> None:
+        from skill_eval.ingest.adapters.opencode import OpencodeImporter
+
+        builder = OpencodeImporter().new_builder(skill_name="s")
+        for ev in EVENTS:
+            builder.feed(ev)
+        trace = builder.finalize(
+            export_info={
+                "id": SID, "cost": 0.001,
+                "tokens": {"input": None, "output": None, "reasoning": None,
+                           "cache": {"read": None, "write": None}},
+                "model": {"id": "glm-5.2", "providerID": "opencode-go"},
+            }
+        )
+        assert trace.usage is not None
+        assert trace.usage.cost_usd == pytest.approx(0.001)
+        assert trace.usage.total_tokens is None
+        assert trace.usage.input_tokens is None
+        assert trace.usage.models == ["glm-5.2"]
+
+    def test_finalize_synthetic_step_for_tool_after_step_finish(self) -> None:
+        from skill_eval.ingest.adapters.opencode import OpencodeImporter
+        from skill_eval.core.schema import NodeType
+
+        builder = OpencodeImporter().new_builder(skill_name="s")
+        builder.feed(STEP_START_1)
+        builder.feed(STEP_FINISH_1)
+        builder.feed(TOOL_USE_BASH)
+        trace = builder.finalize()
+        steps = [c for c in trace.root.children if c.type == NodeType.AGENT_STEP]
+        assert len(steps) == 2
+        assert steps[1].children[0].type == NodeType.TOOL_CALL
+
 
 class TestSkeletonAdapters:
     @pytest.mark.parametrize("agent", ["codex", "claude-code", "pi"])

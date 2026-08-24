@@ -5,6 +5,7 @@ Subprocess and `opencode export` are monkeypatched so tests run without the CLI.
 
 import json
 import shutil
+import subprocess
 
 import pytest
 from fastapi.testclient import TestClient
@@ -53,11 +54,85 @@ EXPORT_JSON = {
 
 class _FakeProc:
     def __init__(self, lines: list[str], returncode: int = 0) -> None:
-        self.stdout = iter(lines)
+        self._stdout = iter(lines)
         self._returncode = returncode
+        self.killed = False
+
+    @property
+    def stdout(self):
+        return self._stdout
 
     def wait(self, timeout: float | None = None) -> int:
         return self._returncode
+
+    def kill(self) -> None:
+        self.killed = True
+        self._returncode = -9
+
+    def terminate(self) -> None:
+        self.killed = True
+
+
+class _SlowFakeProc(_FakeProc):
+    """A proc whose stdout never ends — simulates an ever-streaming runaway process."""
+
+    def __init__(self, lines: list[str]) -> None:
+        super().__init__(lines)
+        import itertools
+        self._slow = itertools.chain(lines, itertools.repeat(None))
+
+    @property
+    def stdout(self):
+        return self._slow
+
+
+class _FakeProcTimeout(_FakeProc):
+    """A proc whose wait() raises TimeoutExpired (legacy post-stream timeout path)."""
+
+    def __init__(self, lines: list[str]) -> None:
+        super().__init__(lines)
+
+    def wait(self, timeout: float | None = None) -> int:
+        raise subprocess.TimeoutExpired(cmd="opencode", timeout=timeout or 0)
+
+
+class _BlockingFakeProc(_FakeProc):
+    """A proc that streams lines then blocks on the next read until kill() unblocks it."""
+
+    def __init__(self, lines: list[str]) -> None:
+        super().__init__(lines)
+        import threading
+        self._kill = threading.Event()
+
+        class _Stdout:
+            def __init__(self, owner: "_BlockingFakeProc") -> None:
+                self._owner = owner
+                self._idx = 0
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                if self._idx < len(lines):
+                    line = lines[self._idx]
+                    self._idx += 1
+                    return line
+                self._owner._kill.wait(timeout=30)
+                raise StopIteration
+
+        self._stdout = _Stdout(self)
+
+    @property
+    def stdout(self):
+        return self._stdout
+
+    def kill(self) -> None:
+        self.killed = True
+        self._kill.set()
+        self._returncode = -9
+
+    def terminate(self) -> None:
+        self.kill()
 
 
 def _patch_run(monkeypatch: pytest.MonkeyPatch, lines: list[str], returncode: int = 0) -> None:
@@ -137,6 +212,47 @@ class TestOpencodeRunner:
         trace = OpencodeRunner().run_stream(RunContext(task="x"), emit=lambda c: None)
         assert trace.tool_names() == ["bash"]
         assert trace.usage is None or trace.usage.cost_usd is None
+
+    def test_run_stream_timeout_kills_proc_and_marks_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proc = _FakeProcTimeout(JSONL_LINES)
+        monkeypatch.setattr(shutil, "which", lambda b: "/fake/opencode")
+        monkeypatch.setattr("skill_eval.runner.opencode.subprocess.Popen", lambda *a, **kw: proc)
+        monkeypatch.setattr("skill_eval.runner.opencode._run_export", lambda sid: None)
+        ctx = RunContext(task="hang", timeout=1)
+        trace = OpencodeRunner().run_stream(ctx, emit=lambda c: None)
+        assert trace.status == RunState.ERROR
+        assert trace.error is not None
+        assert trace.error.kind == "timeout"
+        assert proc.killed is True
+
+    def test_run_stream_watchdog_kills_ever_streaming_proc(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        proc = _BlockingFakeProc(JSONL_LINES)
+        monkeypatch.setattr(shutil, "which", lambda b: "/fake/opencode")
+        monkeypatch.setattr("skill_eval.runner.opencode.subprocess.Popen", lambda *a, **kw: proc)
+        monkeypatch.setattr("skill_eval.runner.opencode._run_export", lambda sid: None)
+        ctx = RunContext(task="runaway", timeout=1)
+        trace = OpencodeRunner().run_stream(ctx, emit=lambda c: None)
+        assert trace.status == RunState.ERROR
+        assert proc.killed is True
+
+    def test_run_stream_unparseable_jsonl_emits_warning(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        lines = [JSONL_LINES[0], "{not valid json", JSONL_LINES[1], JSONL_LINES[2]]
+        monkeypatch.setattr(shutil, "which", lambda b: "/fake/opencode")
+        monkeypatch.setattr(
+            "skill_eval.runner.opencode.subprocess.Popen",
+            lambda *a, **kw: _FakeProc(lines),
+        )
+        monkeypatch.setattr("skill_eval.runner.opencode._run_export", lambda sid: None)
+        emitted: list[dict] = []
+        trace = OpencodeRunner().run_stream(RunContext(task="x"), emit=emitted.append)
+        assert any(e.get("node_type") == "warning" for e in emitted)
+        assert trace.tool_names() == ["bash"]
 
 
 class TestRunnerApi:
