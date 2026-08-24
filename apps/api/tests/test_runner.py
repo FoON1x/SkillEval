@@ -443,3 +443,87 @@ class TestModelsApi:
         assert r.status_code == 200
         body = r.json()
         assert body["models"][0]["id"] == "opencode-go/glm-5.2"
+
+
+class TestModelsParsing:
+    def test_parses_clean_model_lines(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import skill_eval.runner.models as m
+
+        sample = "opencode-go/glm-5.2\nanthropic/claude-opus-4-6\n"
+        monkeypatch.setattr(shutil, "which", lambda b: "/fake/opencode")
+        monkeypatch.setattr(m.subprocess, "run", lambda *a, **kw: _StubOut(stdout=sample))
+        out = m.list_models()
+        assert [x["id"] for x in out] == [
+            "opencode-go/glm-5.2", "anthropic/claude-opus-4-6",
+        ]
+        assert [x["provider"] for x in out] == ["opencode-go", "anthropic"]
+        assert all(x["context_window"] is None for x in out)
+        assert all(x["input_cost"] is None for x in out)
+        assert all(x["output_cost"] is None for x in out)
+
+    def test_rejects_verbose_json_block_garbage(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import skill_eval.runner.models as m
+
+        sample = (
+            "opencode-go/glm-5.2\n"
+            '{\n'
+            '  "id": "opencode-go/glm-5.2",\n'
+            '  "providerID": "opencode-go",\n'
+            '  "name": "GLM-5.2",\n'
+            '  "inputCost": 0.1,\n'
+            '  "outputCost": 0.2\n'
+            '}\n'
+            "anthropic/claude-opus-4-6\n"
+            '{"id": "nested/other", "name": "other"}\n'
+        )
+        monkeypatch.setattr(shutil, "which", lambda b: "/fake/opencode")
+        monkeypatch.setattr(m.subprocess, "run", lambda *a, **kw: _StubOut(stdout=sample))
+        out = m.list_models()
+        assert [x["id"] for x in out] == [
+            "opencode-go/glm-5.2", "anthropic/claude-opus-4-6",
+        ]
+
+    def test_build_cmd_windows_cmd_shim(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import skill_eval.runner.models as m
+
+        monkeypatch.setattr(
+            shutil, "which",
+            lambda b: "C:\\Users\\eric3\\AppData\\Roaming\\npm\\opencode.CMD",
+        )
+        monkeypatch.setattr(m.os, "name", "nt")
+        assert m._build_cmd() == ["cmd", "/c", "opencode", "models"]
+
+    def test_build_cmd_windows_non_cmd_plain(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import skill_eval.runner.models as m
+
+        monkeypatch.setattr(shutil, "which", lambda b: "C:\\bin\\opencode.exe")
+        monkeypatch.setattr(m.os, "name", "nt")
+        assert m._build_cmd() == ["opencode", "models"]
+
+    def test_build_cmd_posix_plain(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import skill_eval.runner.models as m
+
+        monkeypatch.setattr(shutil, "which", lambda b: "/usr/bin/opencode")
+        monkeypatch.setattr(m.os, "name", "posix")
+        assert m._build_cmd() == ["opencode", "models"]
+
+    def test_models_empty_when_returncode_nonzero(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import skill_eval.runner.models as m
+
+        monkeypatch.setattr(shutil, "which", lambda b: "/fake/opencode")
+        monkeypatch.setattr(
+            m.subprocess, "run",
+            lambda *a, **kw: _StubOut(stdout="opencode-go/glm-5.2\n", returncode=1),
+        )
+        assert m.list_models() == []
+
+    def test_models_empty_when_oserror(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import skill_eval.runner.models as m
+
+        monkeypatch.setattr(shutil, "which", lambda b: "/fake/opencode")
+
+        def _raise(*args, **kwargs):
+            raise OSError("boom")
+
+        monkeypatch.setattr(m.subprocess, "run", _raise)
+        assert m.list_models() == []
