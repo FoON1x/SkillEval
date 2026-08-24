@@ -14,7 +14,7 @@
 | P5 | LLM-as-a-Judge | 完成 |
 | P6 | 前端可视化 | 完成 |
 | P7 | opencode CLI 运行抓 Trace（Run 页 + SSE） | 完成 |
-| P8 | 打磨与收尾 | 未开始 |
+| P8 | 打磨与收尾 | 进行中 |
 
 ## 规划阶段记录
 
@@ -89,6 +89,16 @@
 - [2026-08-23] 新增 SSE 端点 `POST /api/runner/run/stream`（`text/event-stream`，线程+队列：event/done/error 帧）与 `GET /api/runner/skills`（扫描 `~/.agents/skills` + superpowers skills，解析 SKILL.md frontmatter）。
 - [2026-08-23] 前端新增 `/run` 页：skill 下拉 / agent 选择 / 工作目录 / `--auto` 开关 / prompt，提交后 fetch+ReadableStream 消费 SSE，实时渲染事件流，done 帧跳转 `/traces/:id`；选中的 skill 注入引导语到 prompt（opencode skill 由模型自动触发，无法强制）。
 - [2026-08-23] OpenAPI/TS 类型重生成。后端 151 用例、前端 24 用例全绿。
+
+## Phase 8 · 打磨与收尾（进行中）
+
+- [2026-08-24] 前端重构 + 模型/提供商选择。设计规格见 `docs/superpowers/specs/2026-08-24-frontend-overhaul-design.md`，执行计划见 `docs/superpowers/plans/2026-08-24-frontend-overhaul.md`。
+  - UI 原语层：Button / Input / Select / Badge / Card / Field / Spinner / EmptyState / Modal / Toast；各页面与领域组件（运行记录、Trace 详情、测试用例、评测记录、对比、运行页）全部迁移到原语。
+  - 主题：slate / 靛蓝 token + 深色模式三态切换（浅色 / 深色 / 跟随系统，ThemeToggle 挂载侧边栏）。
+  - 全站中文化：导航 / 侧边栏 / 各页面标题与操作按钮。
+  - 运行页：提供商→模型级联下拉（数据源 `opencode models --verbose`，以 `provider/model` 作 `--model` 转发）、路径浏览模态（`GET /api/fs/browse` 逐级选择）、SSE 抽离为 `api.postStream` + AbortController 加固（运行中可点「停止」中断）。
+  - 后端新增：`GET /api/runner/models`（列举可用模型，CLI 缺失/超时返回空）、`GET /api/fs/browse`（目录列举）。
+  - 测试：后端 165 例、前端 43 例全绿，`npx tsc -b` 退出 0；Playwright E2E 5 例全绿（E2E seed 同步为真实 opencode JSONL 事件格式 `step_start`/`tool_use`/`step_finish` + `export_info`）。
 
 ## 下一步
 

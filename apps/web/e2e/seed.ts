@@ -1,22 +1,67 @@
 /* E2E seed: imports a demo trace, creates a test case, runs an evaluation. */
 const API = 'http://127.0.0.1:8000'
 
+const SID = 'e2e-sess-1'
+
+/* Real `opencode run --format json` JSONL shape: {"type","timestamp","sessionID","part"}. */
 const RAW = {
-  version: '0.1',
-  session_id: 'e2e-sess-1',
+  session_id: SID,
   skill_name: 'e2e-demo-skill',
   events: [
-    { type: 'session.start', ts: '2026-08-05T10:00:00Z' },
-    { type: 'agent.start', ts: '2026-08-05T10:00:01Z' },
-    { type: 'tool.start', tool: 'read_file', args: { path: '/a' }, ts: '2026-08-05T10:00:02Z' },
-    { type: 'tool.end', tool: 'read_file', result: { ok: true }, ts: '2026-08-05T10:00:07Z' },
-    { type: 'llm.start', model: 'claude-sonnet', input_tokens: 100, ts: '2026-08-05T10:00:07Z' },
-    { type: 'llm.end', output_tokens: 50, cost_usd: 0.001, latency_ms: 900, ts: '2026-08-05T10:00:08Z' },
-    { type: 'tool.start', tool: 'grep', args: { q: 'x' }, ts: '2026-08-05T10:00:09Z' },
-    { type: 'tool.end', tool: 'grep', result: { ok: true }, ts: '2026-08-05T10:00:12Z' },
-    { type: 'agent.end', ts: '2026-08-05T10:00:13Z' },
-    { type: 'session.end', ts: '2026-08-05T10:00:15Z' },
+    {
+      type: 'step_start', timestamp: 1787496829616, sessionID: SID,
+      part: { id: 'p1', messageID: 'm1', sessionID: SID, type: 'step-start' },
+    },
+    {
+      type: 'tool_use', timestamp: 1787496829700, sessionID: SID,
+      part: {
+        type: 'tool', tool: 'read_file', callID: 'c1',
+        state: {
+          status: 'completed', input: { path: '/a' }, output: 'content of /a',
+          metadata: { output: 'content of /a', exit: 0, truncated: false },
+          title: 'read_file', time: { start: 1787496829600, end: 1787496829900 },
+        },
+        id: 'p2', sessionID: SID, messageID: 'm1',
+      },
+    },
+    {
+      type: 'step_finish', timestamp: 1787496829900, sessionID: SID,
+      part: {
+        id: 'p3', reason: 'tool-calls', messageID: 'm1', sessionID: SID, type: 'step-finish',
+        tokens: { total: 100, input: 80, output: 20 }, cost: 0.001,
+      },
+    },
+    {
+      type: 'step_start', timestamp: 1787496831000, sessionID: SID,
+      part: { id: 'p4', messageID: 'm2', sessionID: SID, type: 'step-start' },
+    },
+    {
+      type: 'tool_use', timestamp: 1787496831200, sessionID: SID,
+      part: {
+        type: 'tool', tool: 'grep', callID: 'c2',
+        state: {
+          status: 'completed', input: { q: 'x' }, output: 'match found',
+          metadata: { output: 'match found', exit: 0, truncated: false },
+          title: 'grep', time: { start: 1787496831100, end: 1787496831400 },
+        },
+        id: 'p5', sessionID: SID, messageID: 'm2',
+      },
+    },
+    {
+      type: 'step_finish', timestamp: 1787496831400, sessionID: SID,
+      part: {
+        id: 'p6', reason: 'stop', messageID: 'm2', sessionID: SID, type: 'step-finish',
+        tokens: { total: 200, input: 150, output: 50 }, cost: 0.002,
+      },
+    },
   ],
+  export_info: {
+    id: SID, title: 'e2e-demo-skill', agent: 'build',
+    model: { id: 'demo-model', providerID: 'demo', variant: 'default' },
+    version: '1.18.21', cost: 0.003,
+    tokens: { input: 230, output: 70 },
+    time: { created: 1787496829000, updated: 1787496831400 },
+  },
 }
 
 export async function seed() {

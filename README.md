@@ -26,7 +26,7 @@
 - 后端：Python 3.12 + FastAPI + Pydantic v2 + SQLAlchemy + SQLite（依赖由 [uv](https://docs.astral.sh/uv/) 管理）
 - 前端：React 19 + TypeScript + Vite + Tailwind CSS v4 + React Flow
 - 跨语言 Schema：Pydantic 为单一事实源，OpenAPI 自动生成 TS 类型（`src/api/types.generated.ts`）
-- 测试：pytest（后端 151 例）· Vitest（前端 24 例）· Playwright（E2E 5 例）
+- 测试：pytest（后端 165 例）· Vitest（前端 43 例）· Playwright（E2E 5 例）
 
 ## 快速开始
 
@@ -80,10 +80,12 @@ curl -X POST http://127.0.0.1:8000/api/ingest/import -H "Content-Type: applicati
 
 ### 运行 opencode CLI 并抓取 Trace
 
-在 `http://localhost:5173/run` 选择 Skill（下拉来自已安装的 opencode skill）、Agent、工作目录，
-输入 prompt 后点「运行」。后端 spawn `opencode run --format json --auto`，通过 SSE 实时推送事件到
-前端，运行结束自动入库并跳转到 Trace 详情页——便于快速调试 skill。opencode skill 由模型按需自动
-触发，所选 skill 的引导语会注入 prompt 以提高命中（无法强制触发）。
+在 `http://localhost:5173/run` 选择 Skill（下拉来自已安装的 opencode skill）、Agent、提供商与模型
+（提供商→模型级联，模型列表来自 `opencode models --verbose`，选中后以 `provider/model` 形式作为
+`--model` 转发）、工作目录（可点「浏览」打开路径选择模态逐级挑选，也可直接输入），输入 prompt 后点
+「运行」。后端 spawn `opencode run --format json --auto`，通过 SSE 实时推送事件到前端；运行中可点
+「停止」中断（AbortController 断开流）；运行结束自动入库并跳转到 Trace 详情页——便于快速调试 skill。
+opencode skill 由模型按需自动触发，所选 skill 的引导语会注入 prompt 以提高命中（无法强制触发）。
 
 ### 创建测试用例并评测
 
@@ -129,8 +131,8 @@ $env:SKILLEVAL_LLM_MODEL    = "deepseek-chat"
 ## 测试
 
 ```powershell
-cd apps/api && uv run pytest          # 后端 151 例
-cd apps/web && npm test               # 前端 24 例
+cd apps/api && uv run pytest          # 后端 165 例
+cd apps/web && npm test               # 前端 43 例
 cd apps/web && npm run test:e2e       # Playwright E2E 5 例（自动拉起前后端）
 ```
 
