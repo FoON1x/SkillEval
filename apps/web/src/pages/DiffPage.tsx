@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { diffProjections, projectTrace, type DiffItem, type ProjectableNode } from '../utils/diff'
 import type { TraceLike } from '../utils/trace'
+import { Badge, EmptyState, Select, Spinner } from '../components/ui'
 
 const kindStyle: Record<string, string> = {
   added: 'bg-ok/10 text-ok',
@@ -64,23 +65,23 @@ export default function DiffPage() {
 
   return (
     <div className="mx-auto max-w-5xl p-8">
-      <h2 className="mb-6 text-2xl font-semibold tracking-tight">Trace Diff</h2>
+      <h2 className="mb-6 text-2xl font-semibold tracking-tight">Trace 对比</h2>
 
       <div className="mb-6 grid grid-cols-2 gap-4">
         <label className="flex flex-col gap-1 text-xs text-muted">
           基线 Trace
-          <select value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink">
+          <Select value={from} onChange={(e) => setFrom(e.target.value)}>
             <option value="">选择…</option>
             {traces.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.skill_name ?? t.id} ({t.id.slice(0, 8)})
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted">
           对比 Trace
-          <select value={to} onChange={(e) => setTo(e.target.value)} className="rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink">
+          <Select value={to} onChange={(e) => setTo(e.target.value)}>
             <option value="">选择…</option>
             {traces
               .filter((t) => t.id !== from)
@@ -89,19 +90,17 @@ export default function DiffPage() {
                   {t.skill_name ?? t.id} ({t.id.slice(0, 8)})
                 </option>
               ))}
-          </select>
+          </Select>
         </label>
       </div>
 
       {diff && (
         <div data-testid="diff-view">
           <div className="mb-4 flex flex-wrap gap-2">
-            <span className="rounded-full bg-ok/10 px-2 py-0.5 text-xs text-ok">+{diff.added.length} 新增</span>
-            <span className="rounded-full bg-bad/10 px-2 py-0.5 text-xs text-bad">−{diff.removed.length} 删除</span>
-            <span className="rounded-full bg-wait/10 px-2 py-0.5 text-xs text-wait">~{diff.changed.length} 参数变化</span>
-            <span className="rounded-full bg-skip/10 px-2 py-0.5 text-xs text-faint">
-              顺序{diff.orderChanged ? '有变' : '一致'}
-            </span>
+            <Badge tone="ok">+{diff.added.length} 新增</Badge>
+            <Badge tone="bad">−{diff.removed.length} 删除</Badge>
+            <Badge tone="wait">~{diff.changed.length} 参数变化</Badge>
+            <Badge tone="skip">顺序{diff.orderChanged ? '有变' : '一致'}</Badge>
           </div>
 
           <div className="overflow-hidden rounded-xl border border-line bg-surface">
@@ -128,13 +127,15 @@ export default function DiffPage() {
           </div>
         </div>
       )}
-      {!diff && (
-        <p className="py-10 text-center text-muted">
-          选择两条 Trace 进行对比。
-          {from && !a ? ' 基线加载中…' : ''}
-          {to && !b ? ' 对比加载中…' : ''}
-        </p>
-      )}
+      {!diff &&
+        ((from && !a) || (to && !b) ? (
+          <div className="flex items-center justify-center gap-2 py-16 text-muted">
+            <Spinner size={20} />
+            <span>{from && !a ? '基线加载中…' : '对比加载中…'}</span>
+          </div>
+        ) : (
+          <EmptyState title="选择两条 Trace 进行对比。" />
+        ))}
     </div>
   )
 }

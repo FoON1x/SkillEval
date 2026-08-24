@@ -1,14 +1,5 @@
 import { traceStats, type TraceLike } from '../utils/trace'
-
-function Card({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded-lg border border-line bg-surface px-3 py-2">
-      <p className="text-xs text-faint">{label}</p>
-      <p className="text-lg font-medium tabular-nums">{value}</p>
-      {hint && <p className="text-xs text-muted">{hint}</p>}
-    </div>
-  )
-}
+import { Card } from './ui'
 
 export default function CostPanel({ trace }: { trace: TraceLike }) {
   const stats = traceStats(trace)
@@ -17,14 +8,23 @@ export default function CostPanel({ trace }: { trace: TraceLike }) {
 
   return (
     <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4" data-testid="cost-panel">
-      <Card label="Tokens" value={stats.totalTokens?.toLocaleString() ?? '—'} />
-      <Card label="Cost" value={stats.costUsd != null ? `$${stats.costUsd.toFixed(4)}` : '—'} />
-      <Card label="Latency" value={stats.latencyMs != null ? `${(stats.latencyMs / 1000).toFixed(1)}s` : '—'} />
-      <Card
-        label="Steps"
-        value={`${stats.toolCount} tools`}
-        hint={`${stats.stepCount} steps · ${stats.errorCount} errors`}
-      />
+      <Card>
+        <p className="text-xs text-faint">Tokens</p>
+        <p className="text-lg font-medium tabular-nums">{stats.totalTokens?.toLocaleString() ?? '—'}</p>
+      </Card>
+      <Card>
+        <p className="text-xs text-faint">Cost</p>
+        <p className="text-lg font-medium tabular-nums">{stats.costUsd != null ? `$${stats.costUsd.toFixed(4)}` : '—'}</p>
+      </Card>
+      <Card>
+        <p className="text-xs text-faint">Latency</p>
+        <p className="text-lg font-medium tabular-nums">{stats.latencyMs != null ? `${(stats.latencyMs / 1000).toFixed(1)}s` : '—'}</p>
+      </Card>
+      <Card>
+        <p className="text-xs text-faint">Steps</p>
+        <p className="text-lg font-medium tabular-nums">{stats.toolCount} 个工具</p>
+        <p className="text-xs text-muted">{stats.stepCount} 步 · {stats.errorCount} 错误</p>
+      </Card>
     </div>
   )
 }
