@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, BASE } from '../api/client'
 import { Button, Card, Field, Input, Select, Textarea } from '../components/ui'
+import { Model, groupByProvider, buildModelId } from '../utils/models'
 
 interface Skill {
   name: string
@@ -30,6 +31,9 @@ export default function RunPage() {
   const [skills, setSkills] = useState<Skill[]>([])
   const [skillName, setSkillName] = useState('')
   const [agentName, setAgentName] = useState('build')
+  const [models, setModels] = useState<Model[]>([])
+  const [provider, setProvider] = useState('')
+  const [modelId, setModelId] = useState('')
   const [cwd, setCwd] = useState('')
   const [auto, setAuto] = useState(true)
   const [prompt, setPrompt] = useState('')
@@ -42,6 +46,10 @@ export default function RunPage() {
       .get<{ skills: Skill[] }>('/api/runner/skills')
       .then((b) => setSkills(b.skills))
       .catch(() => setSkills([]))
+    api
+      .get<{ models: Model[] }>('/api/runner/models')
+      .then((b) => setModels(b.models))
+      .catch(() => setModels([]))
   }, [])
 
   async function submit(e: FormEvent) {
@@ -55,6 +63,7 @@ export default function RunPage() {
       skillName && skillName !== '__none__'
         ? `Use the ${skillName} skill to complete the following task. ${prompt}`
         : prompt
+    const model = provider && modelId ? buildModelId(provider, modelId) : null
 
     let resp: Response
     try {
@@ -68,6 +77,7 @@ export default function RunPage() {
           cwd: cwd || null,
           auto,
           agent_name: agentName,
+          model,
         }),
       })
     } catch (err) {
@@ -170,6 +180,42 @@ export default function RunPage() {
               {AGENTS.map((a) => (
                 <option key={a} value={a}>
                   {a}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="提供商" htmlFor="run-provider">
+            <Select
+              id="run-provider"
+              value={provider}
+              onChange={(e) => {
+                setProvider(e.target.value)
+                setModelId('')
+              }}
+            >
+              <option value="">默认（由 opencode 决定）</option>
+              {Object.keys(groupByProvider(models)).map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="模型" htmlFor="run-model">
+            <Select
+              id="run-model"
+              value={modelId}
+              disabled={!provider || !groupByProvider(models)[provider]?.length}
+              onChange={(e) => setModelId(e.target.value)}
+            >
+              {!provider || !groupByProvider(models)[provider]?.length ? (
+                <option value="">选择提供商</option>
+              ) : (
+                <option value="">默认（由 opencode 决定）</option>
+              )}
+              {(groupByProvider(models)[provider] ?? []).map((m) => (
+                <option key={m.id} value={m.model}>
+                  {m.model}
                 </option>
               ))}
             </Select>

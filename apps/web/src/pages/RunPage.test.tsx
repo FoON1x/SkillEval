@@ -13,10 +13,16 @@ function lastPath() {
   return { Tracker, get: () => path }
 }
 
-function mockFetch(sseFrames: string[], skills = [{ name: 'xlsx', description: 'spreadsheet', source: 'a' }]) {
+function mockFetch(sseFrames: string[], skills = [{ name: 'xlsx', description: 'spreadsheet', source: 'a' }], models: { provider: string; model: string; id: string }[] = []) {
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (String(url).includes('/api/runner/skills') && (!init || init.method === undefined)) {
       return new Response(JSON.stringify({ skills }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    if (String(url).includes('/api/runner/models') && (!init || init.method === undefined)) {
+      return new Response(JSON.stringify({ models }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
@@ -74,6 +80,30 @@ describe('RunPage', () => {
       expect(screen.getByRole('option', { name: 'xlsx' })).toBeInTheDocument()
     })
     expect(get()).toBe('/run')
+  })
+
+  it('renders provider→model cascade selects', async () => {
+    const models = [
+      { provider: 'opencode-go', model: 'glm-5.2', id: 'opencode-go/glm-5.2' },
+      { provider: 'anthropic', model: 'claude-opus-4-6', id: 'anthropic/claude-opus-4-6' },
+    ]
+    globalThis.fetch = mockFetch([], [{ name: 'xlsx', description: 'spreadsheet', source: 'a' }], models) as unknown as typeof globalThis.fetch
+    render(
+      <MemoryRouter initialEntries={['/run']}>
+        <Routes>
+          <Route path="/run" element={<RunPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'opencode-go' })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: 'anthropic' })).toBeInTheDocument()
+    })
+    const modelSelect = screen.getByLabelText('模型') as HTMLSelectElement
+    expect(modelSelect).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('提供商'), { target: { value: 'opencode-go' } })
+    expect(screen.getByRole('option', { name: 'glm-5.2' })).toBeInTheDocument()
+    expect(modelSelect).not.toBeDisabled()
   })
 
   it('renders live events in the stream', async () => {
