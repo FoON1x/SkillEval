@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from skill_eval.eval.api import router as eval_router
+from skill_eval.fs import router as fs_router
 from skill_eval.ingest.api import router as ingest_router
 from skill_eval.judge.api import router as judge_router
 from skill_eval.judge.client import LLMClient
@@ -34,6 +35,7 @@ def create_app(store: Store | None = None, judge_client: LLMClient | None = None
     app.include_router(store_router)
     app.include_router(eval_router)
     app.include_router(judge_router)
+    app.include_router(fs_router)
 
     @app.get("/health")
     def health() -> dict[str, str]:
