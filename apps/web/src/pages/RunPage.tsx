@@ -342,16 +342,18 @@ export default function RunPage() {
             <div className="flex flex-wrap items-center gap-1 border-b border-line px-4 py-2 text-sm">
               {(() => {
                 const sep = browsePath.includes('\\') ? '\\' : '/'
+                const posix = browsePath.startsWith('/')
                 const parts = browsePath.split(/[\\/]/).filter((s) => s.length > 0)
                 const crumbs: { label: string; path: string }[] = []
+                if (posix) crumbs.push({ label: '/', path: '/' })
                 let acc = ''
                 parts.forEach((part, i) => {
-                  acc = i === 0 ? part : `${acc}${sep}${part}`
+                  acc = i === 0 ? (posix ? `/${part}` : part) : `${acc}${sep}${part}`
                   crumbs.push({ label: part, path: acc })
                 })
                 return crumbs.map((c, i) => (
                   <span key={i} className="flex items-center gap-1">
-                    {i > 0 && <span className="text-faint">{sep}</span>}
+                    {i > 0 && crumbs[i - 1].label !== '/' && <span className="text-faint">{sep}</span>}
                     {i === crumbs.length - 1 ? (
                       <span className="font-semibold text-ink">{c.label}</span>
                     ) : (
