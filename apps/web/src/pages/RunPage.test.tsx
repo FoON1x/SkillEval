@@ -20,6 +20,7 @@ function mockFetch(
   browseByPath: Record<string, { path: string; entries: { name: string; type: string; path: string }[] }> = {},
   pending = false,
 ) {
+  const bodies: { url: string; body: unknown }[] = []
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (String(url).includes('/api/runner/skills') && (!init || init.method === undefined)) {
       return new Response(JSON.stringify({ skills }), {
@@ -46,6 +47,9 @@ function mockFetch(
       return new Response('not found', { status: 404 })
     }
     if (String(url).includes('/api/runner/run/stream')) {
+      if (init?.body) {
+        bodies.push({ url: String(url), body: JSON.parse(String(init.body)) })
+      }
       const encoder = new TextEncoder()
       let rejectRead: ((reason: unknown) => void) | null = null
       const stream = new ReadableStream({
@@ -74,6 +78,7 @@ function mockFetch(
     }
     return new Response('not found', { status: 404 })
   })
+  ;(fetchMock as unknown as { bodies: { url: string; body: unknown }[] }).bodies = bodies
   return fetchMock
 }
 
@@ -236,6 +241,33 @@ describe('RunPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '选择此目录' }))
     expect((screen.getByLabelText('工作目录') as HTMLInputElement).value).toBe('C:/demo/src')
+  })
+
+  it('submits the selected provider/model in the request body', async () => {
+    const models = [{ provider: 'opencode-go', model: 'glm-5.2', id: 'opencode-go/glm-5.2' }]
+    const fetchMock = mockFetch([SSE_DONE], [{ name: 'xlsx', description: 'spreadsheet', source: 'a' }], models)
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch
+    render(
+      <MemoryRouter initialEntries={['/run']}>
+        <Routes>
+          <Route path="/run" element={<RunPage />} />
+          <Route path="/traces/:id" element={<div />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await waitFor(() => expect(screen.getByRole('option', { name: 'opencode-go' })).toBeInTheDocument())
+
+    fireEvent.change(screen.getByLabelText('提供商'), { target: { value: 'opencode-go' } })
+    fireEvent.change(screen.getByLabelText('模型'), { target: { value: 'glm-5.2' } })
+    fireEvent.change(screen.getByPlaceholderText(/输入要执行的 Prompt/i), { target: { value: 'list files' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /运行/i }))
+    })
+
+    const captured = (fetchMock as unknown as { bodies: { url: string; body: unknown }[] }).bodies
+    expect(captured.length).toBe(1)
+    expect(captured[0].url).toContain('/api/runner/run/stream')
+    expect(captured[0].body).toMatchObject({ model: 'opencode-go/glm-5.2' })
   })
 
   it('stops a running stream and reverts the button', async () => {
