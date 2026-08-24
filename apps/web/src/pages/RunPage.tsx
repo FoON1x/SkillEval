@@ -1,8 +1,14 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, BASE } from '../api/client'
-import { Button, Card, Field, Input, Select, Textarea } from '../components/ui'
+import { Button, Card, Field, Input, Modal, Select, Spinner, Textarea } from '../components/ui'
 import { Model, groupByProvider, buildModelId } from '../utils/models'
+
+interface FsEntry {
+  name: string
+  type: 'dir' | 'file'
+  path: string
+}
 
 interface Skill {
   name: string
@@ -40,6 +46,11 @@ export default function RunPage() {
   const [events, setEvents] = useState<StreamEvent['node'][]>([])
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [browseOpen, setBrowseOpen] = useState(false)
+  const [browsePath, setBrowsePath] = useState('')
+  const [entries, setEntries] = useState<FsEntry[]>([])
+  const [browseLoading, setBrowseLoading] = useState(false)
+  const [browseError, setBrowseError] = useState<string | null>(null)
 
   useEffect(() => {
     api
@@ -129,6 +140,44 @@ export default function RunPage() {
     }
 
     processStream()
+  }
+
+  async function loadDir(path: string | null) {
+    setBrowseLoading(true)
+    setBrowseError(null)
+    try {
+      const b = await api.get<{ path: string; entries: FsEntry[] }>(
+        '/api/fs/browse' + (path ? `?path=${encodeURIComponent(path)}` : ''),
+      )
+      setBrowsePath(b.path)
+      setEntries(b.entries)
+    } catch {
+      setBrowseError('无法读取该目录')
+    } finally {
+      setBrowseLoading(false)
+    }
+  }
+
+  function openBrowse() {
+    setBrowseOpen(true)
+    loadDir(cwd || null)
+  }
+
+  function enterDir(path: string) {
+    loadDir(path)
+  }
+
+  function crumbTo(path: string) {
+    loadDir(path)
+  }
+
+  function confirmBrowse() {
+    setCwd(browsePath)
+    setBrowseOpen(false)
+  }
+
+  function closeBrowse() {
+    setBrowseOpen(false)
   }
 
   const eventLabel = (n: StreamEvent['node']): string => {
@@ -222,12 +271,15 @@ export default function RunPage() {
           </Field>
           <div className="col-span-2">
             <Field label="工作目录" htmlFor="run-cwd">
-              <Input
-                id="run-cwd"
-                placeholder="E:\playground\my-project（留空则用后端 cwd）"
-                value={cwd}
-                onChange={(e) => setCwd(e.target.value)}
-              />
+              <div className="flex items-center gap-2">
+                <Input
+                  id="run-cwd"
+                  placeholder="E:\playground\my-project（留空则用后端 cwd）"
+                  value={cwd}
+                  onChange={(e) => setCwd(e.target.value)}
+                />
+                <Button variant="ghost" onClick={openBrowse}>浏览</Button>
+              </div>
             </Field>
           </div>
           <div className="col-span-2">
@@ -284,6 +336,81 @@ export default function RunPage() {
           </ul>
         </Card>
       )}
+
+      <Modal
+        open={browseOpen}
+        onClose={closeBrowse}
+        title="选择工作目录"
+        footer={
+          <>
+            <Button variant="ghost" onClick={closeBrowse}>取消</Button>
+            <Button variant="primary" disabled={!browsePath} onClick={confirmBrowse}>选择此目录</Button>
+          </>
+        }
+      >
+        {browseLoading ? (
+          <div className="flex justify-center py-8">
+            <Spinner />
+          </div>
+        ) : browseError ? (
+          <div className="flex flex-col items-center gap-3 px-4 py-8">
+            <p className="text-sm text-bad">{browseError}</p>
+            <Button variant="ghost" onClick={() => loadDir(browsePath || null)}>重试</Button>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-1 border-b border-line px-4 py-2 text-sm">
+              {(() => {
+                const sep = browsePath.includes('\\') ? '\\' : '/'
+                const parts = browsePath.split(/[\\/]/).filter((s) => s.length > 0)
+                const crumbs: { label: string; path: string }[] = []
+                let acc = ''
+                parts.forEach((part, i) => {
+                  acc = i === 0 ? part : `${acc}${sep}${part}`
+                  crumbs.push({ label: part, path: acc })
+                })
+                return crumbs.map((c, i) => (
+                  <span key={i} className="flex items-center gap-1">
+                    {i > 0 && <span className="text-faint">{sep}</span>}
+                    {i === crumbs.length - 1 ? (
+                      <span className="font-semibold text-ink">{c.label}</span>
+                    ) : (
+                      <button type="button" className="text-muted hover:text-ink" onClick={() => crumbTo(c.path)}>
+                        {c.label}
+                      </button>
+                    )}
+                  </span>
+                ))
+              })()}
+            </div>
+            {entries.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-muted">空目录</p>
+            ) : (
+              <ul>
+                {entries.map((e) => (
+                  <li key={e.path}>
+                    {e.type === 'dir' ? (
+                      <button
+                        type="button"
+                        onClick={() => enterDir(e.path)}
+                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-ink hover:bg-line/40"
+                      >
+                        <span aria-hidden="true">📁</span>
+                        <span className="truncate">{e.name}</span>
+                      </button>
+                    ) : (
+                      <span className="flex items-center gap-2 px-4 py-2 text-sm text-faint">
+                        <span aria-hidden="true">📄</span>
+                        <span className="truncate">{e.name}</span>
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </Modal>
     </div>
   )
 }

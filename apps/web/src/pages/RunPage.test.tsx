@@ -13,7 +13,12 @@ function lastPath() {
   return { Tracker, get: () => path }
 }
 
-function mockFetch(sseFrames: string[], skills = [{ name: 'xlsx', description: 'spreadsheet', source: 'a' }], models: { provider: string; model: string; id: string }[] = []) {
+function mockFetch(
+  sseFrames: string[],
+  skills = [{ name: 'xlsx', description: 'spreadsheet', source: 'a' }],
+  models: { provider: string; model: string; id: string }[] = [],
+  browseByPath: Record<string, { path: string; entries: { name: string; type: string; path: string }[] }> = {},
+) {
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (String(url).includes('/api/runner/skills') && (!init || init.method === undefined)) {
       return new Response(JSON.stringify({ skills }), {
@@ -26,6 +31,18 @@ function mockFetch(sseFrames: string[], skills = [{ name: 'xlsx', description: '
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
+    }
+    if (String(url).includes('/api/fs/browse')) {
+      const parsed = new URL(String(url), 'http://x')
+      const p = parsed.searchParams.get('path') ?? ''
+      const found = browseByPath[p]
+      if (found) {
+        return new Response(JSON.stringify(found), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response('not found', { status: 404 })
     }
     if (String(url).includes('/api/runner/run/stream')) {
       const stream = new ReadableStream({
@@ -171,5 +188,40 @@ describe('RunPage', () => {
 
     await waitFor(() => expect(screen.getByText(/opencode CLI not available/i)).toBeInTheDocument())
     expect(get()).toBe('/run')
+  })
+
+  it('opens the browse modal and fills cwd on select', async () => {
+    const browseByPath = {
+      '': {
+        path: 'C:/demo',
+        entries: [
+          { name: 'src', type: 'dir', path: 'C:/demo/src' },
+          { name: 'a.txt', type: 'file', path: 'C:/demo/a.txt' },
+        ],
+      },
+      'C:/demo/src': {
+        path: 'C:/demo/src',
+        entries: [{ name: 'b.txt', type: 'file', path: 'C:/demo/src/b.txt' }],
+      },
+    }
+    globalThis.fetch = mockFetch([], [{ name: 'xlsx', description: 'spreadsheet', source: 'a' }], [], browseByPath) as unknown as typeof globalThis.fetch
+    render(
+      <MemoryRouter initialEntries={['/run']}>
+        <Routes>
+          <Route path="/run" element={<RunPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await waitFor(() => expect(screen.getByRole('option', { name: 'xlsx' })).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: '浏览' }))
+    await waitFor(() => expect(screen.getByText('src')).toBeInTheDocument())
+    expect(screen.getByText('a.txt')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('src'))
+    await waitFor(() => expect(screen.getByText('b.txt')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: '选择此目录' }))
+    expect((screen.getByLabelText('工作目录') as HTMLInputElement).value).toBe('C:/demo/src')
   })
 })
