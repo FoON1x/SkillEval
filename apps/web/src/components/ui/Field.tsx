@@ -1,0 +1,12 @@
+import { type ReactNode } from 'react'
+export default function Field({ label, hint, optional, htmlFor, children }: { label: string; hint?: string; optional?: boolean; htmlFor?: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={htmlFor} className="flex items-center gap-1.5 text-xs font-semibold text-ink">
+        {label}{optional && <span className="text-xs font-normal text-faint">可选</span>}
+      </label>
+      {children}
+      {hint && <span className="text-xs text-muted">{hint}</span>}
+    </div>
+  )
+}
