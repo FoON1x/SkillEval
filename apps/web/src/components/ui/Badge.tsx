@@ -5,5 +5,5 @@ const TONES: Record<Tone, string> = {
   skip: 'bg-skip/10 text-skip', neutral: 'bg-surface-2 text-muted',
 }
 export default function Badge({ tone = 'neutral', children }: { tone?: Tone; children: ReactNode }) {
-  return <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${TONES[tone]}`}>{children}</span>
+  return <span role="status" className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${TONES[tone]}`}>{children}</span>
 }

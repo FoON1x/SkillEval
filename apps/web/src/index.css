@@ -17,6 +17,7 @@
   --color-accent-border: #c7d2fe;
   --color-ok: #16a34a;
   --color-bad: #dc2626;
+  --color-bad-ink: #ffffff;
   --color-wait: #0ea5e9;
   --color-skip: #94a3b8;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
@@ -40,6 +41,7 @@
   --color-accent-border: #3730a3;
   --color-ok: #4ade80;
   --color-bad: #f87171;
+  --color-bad-ink: #7f1d1d;
   --color-wait: #38bdf8;
   --color-skip: #64748b;
   color-scheme: dark;
