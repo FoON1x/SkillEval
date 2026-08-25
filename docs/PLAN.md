@@ -71,6 +71,13 @@ apps/api (FastAPI)
 
 - 一键启动脚本；.gitignore/环境样例；README 快速开始；PROGRESS 收尾；示例用例与示例 Trace。
 
+### Phase 8 · 前端重构 + 文档治理
+
+- 任务（规格 1）：全前端统一中文文案；slate/靛蓝主题 + 深色模式三态；UI 原语层（components/ui/）；运行页提供商→模型级联 + 路径浏览模态 + SSE 加固；后端 GET /api/runner/models 与 /api/fs/browse。
+- 任务（规格 2）：根 CHANGELOG（Keep-a-Changelog + semver）；docs/README 文档索引；docs/CODE_REVIEW 归档；AGENTS.md 文档机制/变更日志/技术约定扩充。
+- 设计规格：`docs/superpowers/specs/2026-08-24-frontend-overhaul-design.md`、`docs/superpowers/specs/2026-08-24-governance-docs-changelog-design.md`；执行计划：`docs/superpowers/plans/2026-08-24-frontend-overhaul.md`、`docs/superpowers/plans/2026-08-24-governance-docs-changelog.md`。
+- 出口：后端 pytest、前端 vitest、`npx tsc -b` 全绿；E2E 覆盖运行页主链路。
+
 ## 3. 每阶段通用流程（DoD）
 
 1. 更新 PLAN/PROGRESS。

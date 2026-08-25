@@ -1,5 +1,6 @@
 # 开发进展（Progress）
 
+> 本文件为开发进展叙述；正式发布变更日志见根 `CHANGELOG.md`。
 > 实时更新。每条记录格式：`- [日期] 阶段 / 内容`。每次里程碑结束更新"总览表"。
 
 ## 总览
@@ -14,7 +15,7 @@
 | P5 | LLM-as-a-Judge | 完成 |
 | P6 | 前端可视化 | 完成 |
 | P7 | opencode CLI 运行抓 Trace（Run 页 + SSE） | 完成 |
-| P8 | 打磨与收尾 | 进行中 |
+| P8 | 前端重构 + 治理 | 进行中 |
 
 ## 规划阶段记录
 
@@ -90,7 +91,9 @@
 - [2026-08-23] 前端新增 `/run` 页：skill 下拉 / agent 选择 / 工作目录 / `--auto` 开关 / prompt，提交后 fetch+ReadableStream 消费 SSE，实时渲染事件流，done 帧跳转 `/traces/:id`；选中的 skill 注入引导语到 prompt（opencode skill 由模型自动触发，无法强制）。
 - [2026-08-23] OpenAPI/TS 类型重生成。后端 151 用例、前端 24 用例全绿。
 
-## Phase 8 · 打磨与收尾（进行中）
+## Phase 8 · 前端重构 + 治理（进行中）
+
+### 规格 1 · 前端重构
 
 - [2026-08-24] 前端重构 + 模型/提供商选择。设计规格见 `docs/superpowers/specs/2026-08-24-frontend-overhaul-design.md`，执行计划见 `docs/superpowers/plans/2026-08-24-frontend-overhaul.md`。
   - UI 原语层：Button / Input / Select / Badge / Card / Field / Spinner / EmptyState / Modal / Toast；各页面与领域组件（运行记录、Trace 详情、测试用例、评测记录、对比、运行页）全部迁移到原语。
@@ -98,8 +101,17 @@
   - 全站中文化：导航 / 侧边栏 / 各页面标题与操作按钮。
   - 运行页：提供商→模型级联下拉（数据源 `opencode models --verbose`，以 `provider/model` 作 `--model` 转发）、路径浏览模态（`GET /api/fs/browse` 逐级选择）、SSE 抽离为 `api.postStream` + AbortController 加固（运行中可点「停止」中断）。
   - 后端新增：`GET /api/runner/models`（列举可用模型，CLI 缺失/超时返回空）、`GET /api/fs/browse`（目录列举）。
-  - 测试：后端 165 例、前端 43 例全绿，`npx tsc -b` 退出 0；Playwright E2E 5 例全绿（E2E seed 同步为真实 opencode JSONL 事件格式 `step_start`/`tool_use`/`step_finish` + `export_info`）。
+  - 经验收修复：状态词中文化（运行状态/节点状态文案）、FOUC（ThemeProvider 首帧 resolved 用已存模式 + index.html 内联脚本）、SSE 断流（postStream 异常断开触发 onError）、模型列举失败提示。
+  - 测试：后端 173 例、前端 63 例全绿，`npx tsc -b` 退出 0；Playwright E2E 5 例全绿（E2E seed 同步为真实 opencode JSONL 事件格式 `step_start`/`tool_use`/`step_finish` + `export_info`）。
+
+### 规格 2 · 文档治理
+
+- [2026-08-24] 文档治理。设计规格见 `docs/superpowers/specs/2026-08-24-governance-docs-changelog-design.md`，执行计划见 `docs/superpowers/plans/2026-08-24-governance-docs-changelog.md`。
+  - 根 `CHANGELOG.md`：Keep-a-Changelog + semver，回填 0.1.0/0.2.0 + 0.3.0 草案，附决策记录。
+  - `docs/README.md`：文档索引导航（各文档用途一览）。
+  - `docs/CODE_REVIEW.md`：代码审查归档（已处理 / 残留项）。
+  - AGENTS.md 扩充：文档机制 / 变更日志约定 / 关键技术约定 / 提交约定调和（自 0.3.0 起中文提交，历史不重写）。
 
 ## 下一步
 
-Phase 8：打磨与收尾（其余 Agent Trace 样例回填、LLM 评测联调、性能/细节优化）。
+Phase 8：其余 Agent Trace 样例回填、LLM 评测联调、性能/细节优化。
