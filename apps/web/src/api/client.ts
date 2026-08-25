@@ -58,6 +58,7 @@ export async function postStream(path: string, body: unknown, h: StreamHandlers)
   const reader = resp.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
+  let terminated = false
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
@@ -76,11 +77,14 @@ export async function postStream(path: string, body: unknown, h: StreamHandlers)
       if (data.type === 'event' && data.node) h.onEvent(data.node)
       else if (data.type === 'done' && data.trace_id) {
         h.onDone(data.trace_id)
+        terminated = true
         return
       } else if (data.type === 'error') {
         h.onError(data.message ?? '运行失败')
+        terminated = true
         return
       }
     }
   }
+  if (!terminated) h.onError('连接中断')
 }
