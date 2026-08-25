@@ -8,7 +8,9 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode | null
     return saved ?? 'system'
   })
-  const [resolved, setResolved] = useState<Resolved>(() => resolveMode('system'))
+  const [resolved, setResolved] = useState<Resolved>(() =>
+    resolveMode((localStorage.getItem(STORAGE_KEY) as ThemeMode | null) ?? 'system'),
+  )
 
   useEffect(() => {
     const r = resolveMode(mode)
