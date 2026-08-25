@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { api, ApiError } from '../api/client'
 import { Badge, Button, Card, EmptyState, Input, Select, Textarea, useToast } from '../components/ui'
+import { resultLabel } from '../utils/labels'
 
 interface TestCase {
   id: string
@@ -184,7 +185,7 @@ export default function TestCasePage() {
               <div className="flex items-center gap-2">
                 {lastRun?.caseId === tc.id && (
                   <Badge data-testid="eval-result" tone={resultTone[lastRun.result] ?? 'skip'}>
-                    {lastRun.result}
+                    {resultLabel(lastRun.result)}
                     {lastRun.score != null ? ` · ${lastRun.score.toFixed(2)}` : ''}
                     {lastRun.error ? ` · ${lastRun.error}` : ''}
                   </Badge>

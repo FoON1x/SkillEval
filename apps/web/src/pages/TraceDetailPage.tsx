@@ -7,6 +7,7 @@ import Timeline from '../components/Timeline'
 import TraceDag from '../components/TraceDag'
 import { flattenTree, type TraceLike } from '../utils/trace'
 import { Badge, Button, Card, EmptyState, Spinner } from '../components/ui'
+import { statusLabel } from '../utils/labels'
 
 interface JudgeReport {
   score: number
@@ -102,7 +103,7 @@ export default function TraceDetailPage() {
               {trace.agent}
             </span>
             <span className="ml-2">
-              <Badge tone={statusTone[trace.status] ?? 'neutral'}>{trace.status}</Badge>
+              <Badge tone={statusTone[trace.status] ?? 'neutral'}>{statusLabel(trace.status)}</Badge>
             </span>
           </h2>
         </div>

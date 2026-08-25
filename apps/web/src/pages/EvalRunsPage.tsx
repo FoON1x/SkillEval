@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { Badge, Card, EmptyState } from '../components/ui'
+import { resultLabel } from '../utils/labels'
 
 interface EvalRun {
   id: string
@@ -38,7 +39,7 @@ export default function EvalRunsPage() {
           <Card key={run.id}>
             <button className="flex w-full items-center justify-between text-left" onClick={() => setOpenId(openId === run.id ? null : run.id)}>
               <div className="flex items-center gap-3">
-                <Badge tone={resultTone[run.result] ?? 'skip'}>{run.result}</Badge>
+                <Badge tone={resultTone[run.result] ?? 'skip'}>{resultLabel(run.result)}</Badge>
                 <Badge tone="neutral">{run.rule}</Badge>
                 {run.score != null && (
                   <span className="text-sm tabular-nums text-muted">score {run.score.toFixed(2)}</span>

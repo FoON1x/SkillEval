@@ -1,4 +1,5 @@
 import type { Row } from '../utils/trace'
+import { statusLabel } from '../utils/labels'
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -38,7 +39,7 @@ export default function DetailPanel({ row }: { row: Row | null }) {
         <span className="font-medium">{row.name}</span>
       </div>
       <p className="mt-1 text-xs text-muted">
-        {row.type} · {row.status} · {dur}
+        {row.type} · {statusLabel(row.status)} · {dur}
         {row.error ? ` · ${row.error.message}` : ''}
       </p>
 

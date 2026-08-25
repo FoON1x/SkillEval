@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { Badge, EmptyState, Select, Spinner } from '../components/ui'
+import { statusLabel } from '../utils/labels'
 
 export interface TraceSummary {
   id: string
@@ -63,9 +64,9 @@ export default function TracesPage() {
           </Select>
           <Select value={status} onChange={(e) => setStatus(e.target.value)} className="w-32">
             <option value="">全部状态</option>
-            <option value="completed">completed</option>
-            <option value="running">running</option>
-            <option value="error">error</option>
+            <option value="completed">已完成</option>
+            <option value="running">运行中</option>
+            <option value="error">错误</option>
           </Select>
         </div>
       </div>
@@ -99,7 +100,7 @@ export default function TracesPage() {
                   </td>
                   <td className="px-4 py-3 text-muted">{t.agent}</td>
                   <td className="px-4 py-3">
-                    <Badge tone={statusTone[t.status] ?? 'neutral'}>{t.status}</Badge>
+                    <Badge tone={statusTone[t.status] ?? 'neutral'}>{statusLabel(t.status)}</Badge>
                   </td>
                   <td className="px-4 py-3 text-muted">
                     {t.started_at ? new Date(t.started_at).toLocaleString() : '—'}
