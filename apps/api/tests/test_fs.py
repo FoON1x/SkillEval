@@ -48,3 +48,17 @@ def test_browse_empty_path_uses_home(client: TestClient):
     assert r.status_code == 200
     from pathlib import Path as P
     assert r.json()["path"] == str(P.home().resolve())
+
+
+def test_browse_permission_error_returns_200_with_empty_entries(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    def raise_permission(self: Path):
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(Path, "iterdir", raise_permission)
+    r = client.get("/api/fs/browse", params={"path": str(tmp_path)})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["path"] == str(tmp_path.resolve())
+    assert body["entries"] == []

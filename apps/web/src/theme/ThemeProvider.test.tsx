@@ -4,7 +4,6 @@ import ThemeProvider from './ThemeProvider'
 import ThemeToggle from './ThemeToggle'
 import { useTheme } from './useTheme'
 import indexHtml from '../../index.html?raw'
-
 function stubMatchMedia(matches = false) {
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
     matches,
@@ -50,10 +49,18 @@ describe('ThemeProvider', () => {
     expect(localStorage.getItem('skilleval-theme')).toBe('dark')
   })
 
-  it('persists choice across remount', () => {
-    localStorage.setItem('skilleval-theme', 'light')
+  it('persists choice across a real remount', () => {
+    const { unmount } = render(<ThemeProvider><ThemeToggle /></ThemeProvider>)
+    fireEvent.click(screen.getByRole('button', { name: /深色/i }))
+    expect(localStorage.getItem('skilleval-theme')).toBe('dark')
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+    unmount()
+
+    document.documentElement.classList.remove('dark')
+
     render(<ThemeProvider><ThemeToggle /></ThemeProvider>)
-    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    expect(localStorage.getItem('skilleval-theme')).toBe('dark')
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
   })
 
   it('light button removes dark class', () => {

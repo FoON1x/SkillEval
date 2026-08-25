@@ -326,4 +326,104 @@ describe('RunPage', () => {
     )
     await waitFor(() => expect(screen.getByText(/模型列表获取失败/i)).toBeInTheDocument())
   })
+
+  it('clears modelId when the provider changes (T1)', async () => {
+    const models = [
+      { provider: 'opencode-go', model: 'glm-5.2', id: 'opencode-go/glm-5.2' },
+      { provider: 'anthropic', model: 'claude-opus-4-6', id: 'anthropic/claude-opus-4-6' },
+    ]
+    globalThis.fetch = mockFetch([], [{ name: 'xlsx', description: 'spreadsheet', source: 'a' }], models) as unknown as typeof globalThis.fetch
+    render(
+      <MemoryRouter initialEntries={['/run']}>
+        <Routes>
+          <Route path="/run" element={<RunPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await waitFor(() => expect(screen.getByRole('option', { name: 'opencode-go' })).toBeInTheDocument())
+
+    const modelSelect = screen.getByLabelText('模型') as HTMLSelectElement
+    fireEvent.change(screen.getByLabelText('提供商'), { target: { value: 'opencode-go' } })
+    fireEvent.change(modelSelect, { target: { value: 'glm-5.2' } })
+    expect(modelSelect.value).toBe('glm-5.2')
+
+    fireEvent.change(screen.getByLabelText('提供商'), { target: { value: 'anthropic' } })
+    expect(modelSelect.value).toBe('')
+  })
+
+  it('breadcrumb navigation handles POSIX root and segments (T2)', async () => {
+    const browseByPath = {
+      '': {
+        path: '/home/user/project',
+        entries: [{ name: 'src', type: 'dir', path: '/home/user/project/src' }],
+      },
+      '/home/user': {
+        path: '/home/user',
+        entries: [{ name: 'project', type: 'dir', path: '/home/user/project' }],
+      },
+      '/': {
+        path: '/',
+        entries: [{ name: 'home', type: 'dir', path: '/home' }],
+      },
+    }
+    const fetchMock = mockFetch([], [{ name: 'xlsx', description: 'spreadsheet', source: 'a' }], [], browseByPath)
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch
+    render(
+      <MemoryRouter initialEntries={['/run']}>
+        <Routes>
+          <Route path="/run" element={<RunPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await waitFor(() => expect(screen.getByRole('option', { name: 'xlsx' })).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: '浏览' }))
+    await waitFor(() => expect(screen.getByText('src')).toBeInTheDocument())
+
+    const userCrumb = screen.getByRole('button', { name: 'user' })
+    fireEvent.click(userCrumb)
+    await waitFor(() => expect(screen.getByText('project')).toBeInTheDocument())
+    expect(fetchMock.mock.calls.some((c) => String(c[0]).includes('path=%2Fhome%2Fuser'))).toBe(true)
+
+    const rootCrumb = screen.getByRole('button', { name: '/' })
+    fireEvent.click(rootCrumb)
+    await waitFor(() => expect(screen.getByText('home')).toBeInTheDocument())
+    expect(fetchMock.mock.calls.some((c) => String(c[0]).includes('path=%2F'))).toBe(true)
+  })
+
+  it('file entries are not clickable and do not trigger loadDir (T5)', async () => {
+    const browseByPath = {
+      '': {
+        path: 'C:/demo',
+        entries: [
+          { name: 'src', type: 'dir', path: 'C:/demo/src' },
+          { name: 'a.txt', type: 'file', path: 'C:/demo/a.txt' },
+        ],
+      },
+    }
+    const fetchMock = mockFetch([], [{ name: 'xlsx', description: 'spreadsheet', source: 'a' }], [], browseByPath)
+    globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch
+    render(
+      <MemoryRouter initialEntries={['/run']}>
+        <Routes>
+          <Route path="/run" element={<RunPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await waitFor(() => expect(screen.getByRole('option', { name: 'xlsx' })).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: '浏览' }))
+    await waitFor(() => expect(screen.getByText('a.txt')).toBeInTheDocument())
+
+    const browseCallsBefore = fetchMock.mock.calls.filter((c) =>
+      String(c[0]).includes('/api/fs/browse'),
+    ).length
+
+    fireEvent.click(screen.getByText('a.txt'))
+
+    const browseCallsAfter = fetchMock.mock.calls.filter((c) =>
+      String(c[0]).includes('/api/fs/browse'),
+    ).length
+    expect(browseCallsAfter).toBe(browseCallsBefore)
+  })
 })
