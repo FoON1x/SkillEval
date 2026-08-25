@@ -38,6 +38,7 @@ export default function RunPage() {
   const [skillName, setSkillName] = useState('')
   const [agentName, setAgentName] = useState('build')
   const [models, setModels] = useState<Model[]>([])
+  const [modelsError, setModelsError] = useState(false)
   const [provider, setProvider] = useState('')
   const [modelId, setModelId] = useState('')
   const [cwd, setCwd] = useState('')
@@ -60,8 +61,14 @@ export default function RunPage() {
       .catch(() => setSkills([]))
     api
       .get<{ models: Model[] }>('/api/runner/models')
-      .then((b) => setModels(b.models))
-      .catch(() => setModels([]))
+      .then((b) => {
+        setModels(b.models)
+        setModelsError(false)
+      })
+      .catch(() => {
+        setModels([])
+        setModelsError(true)
+      })
     return () => {
       abortRef.current?.abort()
     }
@@ -252,6 +259,9 @@ export default function RunPage() {
                 </option>
               ))}
             </Select>
+            {modelsError && (
+              <p className="text-xs text-bad">模型列表获取失败，可使用默认模型或稍后重试</p>
+            )}
           </Field>
           <div className="col-span-2">
             <Field label="工作目录" htmlFor="run-cwd">

@@ -19,6 +19,7 @@ function mockFetch(
   models: { provider: string; model: string; id: string }[] = [],
   browseByPath: Record<string, { path: string; entries: { name: string; type: string; path: string }[] }> = {},
   pending = false,
+  options: { modelsFail?: boolean; modelsStatus?: number } = {},
 ) {
   const bodies: { url: string; body: unknown }[] = []
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
@@ -29,6 +30,15 @@ function mockFetch(
       })
     }
     if (String(url).includes('/api/runner/models') && (!init || init.method === undefined)) {
+      if (options.modelsFail) {
+        throw new Error('network error')
+      }
+      if (options.modelsStatus) {
+        return new Response(JSON.stringify({ detail: 'upstream down' }), {
+          status: options.modelsStatus,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
       return new Response(JSON.stringify({ models }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -296,5 +306,24 @@ describe('RunPage', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '运行' })).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: '停止' })).not.toBeInTheDocument()
     expect(get()).toBe('/run')
+  })
+
+  it('shows a hint when the model list fetch fails', async () => {
+    globalThis.fetch = mockFetch(
+      [],
+      [{ name: 'xlsx', description: 'spreadsheet', source: 'a' }],
+      [],
+      {},
+      false,
+      { modelsFail: true },
+    ) as unknown as typeof globalThis.fetch
+    render(
+      <MemoryRouter initialEntries={['/run']}>
+        <Routes>
+          <Route path="/run" element={<RunPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await waitFor(() => expect(screen.getByText(/模型列表获取失败/i)).toBeInTheDocument())
   })
 })
