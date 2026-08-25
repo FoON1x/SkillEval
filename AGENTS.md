@@ -27,13 +27,13 @@ npm run dev          # http://localhost:5173
 ## 测试与验证
 
 ```powershell
-# 后端（apps/api）—— 151 例
+# 后端（apps/api）—— 173 例
 uv run pytest
 uv run pytest tests/test_rules.py            # 单文件
 uv run pytest tests/test_rules.py::test_xxx  # 单用例
 
 # 前端（apps/web）
-npm test              # vitest run，24 例
+npm test              # vitest run，63 例
 npm run test:watch    # 监听
 npm run test:e2e      # Playwright E2E，5 例
 
@@ -59,6 +59,13 @@ npx tsc -b
 - **采集双通道 + Runner 抽象**（ADR-005）：导入适配器 `parse(raw) -> Trace` 按 agent 注册；推送端点组装增量事件；Runner 抽象 `run_stream(context, emit) -> Trace`。**opencode 适配器已用真实 `opencode run --format json` JSONL 格式实现**（事件 `step_start`/`text`/`tool_use`/`step_finish`，epoch-ms 时间戳），runner 已落地（spawn CLI + SSE 流 + `opencode export` enrich）；codex / claude code / pi 为骨架（导入返回未实现错误）。
 - **opencode CLI 运行**：前端 `/run` 页 → `POST /api/runner/run/stream`（SSE）。后端 `OpencodeRunner.run_stream` spawn 子进程、逐行读 JSONL、emit 事件、结束后 `opencode export <sid>` 取权威 metadata。`GET /api/runner/skills` 扫描 `~/.agents/skills` + superpowers skills 的 SKILL.md frontmatter。opencode skill 由模型自动触发、无法强制，所选 skill 注入引导语到 prompt。
 
+## 关键技术约定
+
+- **i18n**：前端统一中文，保留产品术语（Trace/Skill/Agent/DAG/Token/Cost/Prompt/SSE/CLI）；不引入 i18n 库；双语若需另开规格。
+- **设计系统**：slate/靛蓝语义 token（`apps/web/src/index.css` `@theme`）；深色模式 = `@custom-variant dark` + `.dark` token 覆盖 + 三态切换（浅/深/系统）；通用 UI 原语在 `apps/web/src/components/ui/`，页面禁内联重复按钮/输入/选择/徽章/卡片标记。
+- **运行页 model 字段**：提交格式 `provider/model`（合并），无独立 provider 字段；对应 opencode CLI `--model provider/model`。
+- **后端端点**：`GET /api/runner/models`（列举模型，shell `opencode models`）、`GET /api/fs/browse?path=`（目录列举，供路径选择模态）。
+
 ## 环境变量
 
 | 变量 | 作用 | 默认 |
@@ -76,3 +83,48 @@ npx tsc -b
 ## 文档
 
 架构决策与 Schema 细节见 `docs/ADR.md`、`docs/SCHEMA.md`；需求/计划/进展见 `docs/REQUIREMENTS.md`、`docs/PLAN.md`、`docs/PROGRESS.md`。文档驱动开发，改动相关模块时对照对应文档。
+
+## 文档机制
+
+文档清单（完整索引见 `docs/README.md`）：
+
+| 文档 | 用途 |
+| --- | --- |
+| `README.md` | 项目总览 / 快速开始 / API 概览 |
+| `AGENTS.md` | OpenCode 会话约定（本文件） |
+| `CHANGELOG.md` | 变更日志（Keep-a-Changelog + semver） |
+| `docs/REQUIREMENTS.md` | 需求分析 |
+| `docs/PLAN.md` | 执行计划（Phase） |
+| `docs/PROGRESS.md` | 开发进展叙述（按 Phase） |
+| `docs/ADR.md` | 架构决策记录（ADR-00x） |
+| `docs/SCHEMA.md` | Canonical Trace Schema |
+| `docs/CODE_REVIEW.md` | 代码审查归档（已处理 / 残留项） |
+| `docs/README.md` | 文档索引导航 |
+| `docs/superpowers/specs/` | 设计规格 |
+| `docs/superpowers/plans/` | 实现计划 |
+
+更新触发：
+
+- 改 Schema 必更 `docs/SCHEMA.md` + 重新生成 OpenAPI 类型（见「架构约束」）。
+- 改架构决策必更 `docs/ADR.md`（新增 ADR 或标记旧 ADR Superseded）。
+- 完成 Phase 必更 `docs/PROGRESS.md`。
+- 发布节点必更 `CHANGELOG.md`（见「变更日志约定」）。
+- 改端点必更 `README.md` API 概览。
+
+superpowers 工作流：
+
+- 较大改动走「头脑风暴 → `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` → `docs/superpowers/plans/YYYY-MM-DD-<topic>.md` → 执行」；规格与计划分开提交，便于审查与模型切换。
+
+## 变更日志约定
+
+- **何时更新**：每次较大更新（新功能 / 破坏性改动 / 重要修复）必在 `CHANGELOG.md` 新增或更新版本节。
+- **semver**：破坏性 → major；新功能 → minor；修复 → patch。
+- **决策原因**：每节附「决策记录」子节，记录关键选型理由（避免后续重复决策）。
+- **发布**：可选打 git tag `v<版本>`。
+
+## 版本控制
+
+- 减少不必要的git commit操作，只在必要节点进行git commit。
+- git commit作为重要的节点，需要请求用户审查，用户审查同意后可执行commit操作。
+- git commit commend使用中文撰写，参考格式为：feat(<范围>): commend。其中commend需要凝练，且清晰。
+- 自 0.3.0 起严格执行中文提交信息；历史英文提交不重写（rebase 风险 > 收益）。
